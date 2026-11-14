@@ -37,6 +37,8 @@ labelled an estimate, not billing truth.
 
 ## Architecture
 
+![COSTERA high-level solution architecture (M1–M3)](docs/architecture.png)
+
 - Static React 19 + TypeScript + Vite + Tailwind frontend (`src/`), built to `dist/`.
 - **Cloudflare Pages Functions** (`functions/api/[[path]].ts`) expose `/api/health`,
   `/api/batch`, `/api/triage`. The runtime-agnostic triage core lives in `server/`.
