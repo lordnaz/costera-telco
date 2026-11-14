@@ -1,6 +1,7 @@
 // DEV-ONLY fixture classifier. Simulates decision-model-preview responses so the
 // walking skeleton can be exercised without credentials. Never deployed: the
 // published Function has no fixture path and returns service_not_configured instead.
+import { buildDecisionRequest } from "../server/decision.ts";
 import type { ClassifyFn } from "../server/decision.ts";
 
 type Fixture = {
@@ -54,5 +55,16 @@ export const fixtureClassify: ClassifyFn = async (ticket) => {
     inputTokens: f.tokens,
     latencyMs: f.latency,
     requestId: `fixture-${ticket.id}`,
+    request: buildDecisionRequest(ticket).body,
+    raw: {
+      model: "decision-model-preview",
+      request_id: `fixture-${ticket.id}`,
+      answers: {
+        intent: { type: "choice", choice: f.intent[0], confidence: f.intent[1], probabilities: f.intent[2] },
+        complexity: { type: "choice", choice: f.complexity[0], confidence: f.complexity[1], probabilities: {} },
+      },
+      usage: { input_tokens: f.tokens },
+      latency_ms: f.latency,
+    },
   };
 };

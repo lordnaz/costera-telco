@@ -12,6 +12,7 @@ dist/
 # Logs
 *.log
 *.tsbuildinfo
+logs/
 
 # Cloudflare / wrangler local state and secrets
 .wrangler/

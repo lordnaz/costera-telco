@@ -14,7 +14,7 @@ names, branding, customer data or employer systems are used.
 ## Flow (M1 walking skeleton)
 
 1. Agent loads the synthetic ticket batch (22 tickets).
-2. Tier 1 (`decision-model-preview`) classifies intent + complexity with probabilities.
+2. Tier 1 classifier (`decision-model-preview`) classifies intent + complexity with probabilities.
 3. Routing:
    - **Direct / code lane** — deterministic lookup against a synthetic knowledge base
      (plans, accounts, known outages, procedures). No generation call.
@@ -22,6 +22,18 @@ names, branding, customer data or employer systems are used.
    - **Tier 2 candidate** — complex with no deterministic answer (escalation itself is M2).
 4. Output: recurring patterns with evidence (ticket IDs, quoted lines, counts, confidence),
    a per-ticket routing table, and a deterministically assembled draft escalation brief.
+
+M2 adds the escalation lanes: Tier 2 light (`qwen3.8-flash`) writes plain-language summaries
+for the escalation set (candidates + human review); Tier 2 heavy (`qwen3.8-max`) analyses
+cross-ticket clusters **only when warranted** (high-volume, or containing unsure/candidate
+tickets). Human-review handoffs carry the summaries and analysis. All Tier 2 output is
+labelled model-generated in the UI, the brief and the run logs.
+
+M3 adds a merged "Models & cost routing" section: one card per lane with its tier, model
+name, role, and (after a run) calls/tokens/latency plus estimated cost. Below the cards, a
+plain-language comparison shows routed cost vs an all-Max baseline as two bars, with the
+savings percentage. Rates are fixed assumptions listed in a footnote; every figure is
+labelled an estimate, not billing truth.
 
 ## Architecture
 
@@ -79,6 +91,17 @@ Checks:
 node dev/node-check.mjs            # credential-free handler checks (Node)
 npm run build                      # type-check + static build
 ```
+
+## Run logs
+
+Every triage run produces an audit record: run ID, timestamp, mode, stats, and a per-ticket
+trace with the exact request body sent to the decision model and its raw response, plus the
+routing outcome. Logs never contain headers, the API key, or the endpoint hostname.
+
+- Local dev servers write one pretty JSON file per run to `logs/` (gitignored).
+- Deployed Pages Functions emit one structured JSON line per run to the console
+  (visible in Cloudflare Pages logs).
+- `POST /api/triage` with `{"includeTrace": true}` also returns the trace in the response.
 
 ## Deployment
 

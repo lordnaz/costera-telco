@@ -28,6 +28,7 @@ export interface TicketResult {
   reasons: string[];
   lookup: LookupHit | null;
   quotes: string[];
+  summary: string | null;
   inputTokens: number | null;
   latencyMs: number | null;
 }
@@ -46,6 +47,29 @@ export interface Pattern {
   note: string;
 }
 
+export interface ClusterAnalysis {
+  key: string;
+  title: string;
+  ticketIds: string[];
+  count: number;
+  summary: string;
+  likelyCause: string | null;
+  nextStep: string | null;
+  caveats: string | null;
+  model: string;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  latencyMs: number | null;
+  note: string;
+}
+
+export interface Tier2Usage {
+  calls: number;
+  inputTokens: number;
+  outputTokens: number;
+  avgLatencyMs: number | null;
+}
+
 export interface TriageStats {
   tickets: number;
   tier1Calls: number;
@@ -54,6 +78,7 @@ export interface TriageStats {
   lanes: Record<string, number>;
   patterns: number;
   errors: number;
+  tier2: { light: Tier2Usage; heavy: Tier2Usage };
 }
 
 export interface TriageResult {
@@ -65,7 +90,8 @@ export interface TriageResult {
   generatedAt: string;
   tickets: TicketResult[];
   patterns: Pattern[];
-  humanQueue: { id: string; reasons: string[] }[];
+  analyses: ClusterAnalysis[];
+  humanQueue: { id: string; reasons: string[]; summary: string | null }[];
   brief: string;
   stats: TriageStats;
 }

@@ -5,9 +5,10 @@ import assert from "node:assert/strict";
 import { createHandler } from "../server/handler.ts";
 import { parseDecision } from "../server/decision.ts";
 import { fixtureClassify } from "./fixtures.ts";
+import { fixtureAnalyze, fixtureSummarize } from "./fixtures-tier2.ts";
 
 const BASE = "http://127.0.0.1:8000/api";
-const fixtureHandler = createHandler(() => undefined, fixtureClassify);
+const fixtureHandler = createHandler(() => undefined, { classify: fixtureClassify });
 const unconfiguredLive = createHandler(() => undefined);
 
 async function call(handler, path, method = "GET", body) {
@@ -121,6 +122,75 @@ async function call(handler, path, method = "GET", body) {
   assert.equal(d.latencyMs, 269.7);
   assert.throws(() => parseDecision({ choices: [{ message: { content: "hi" } }] }, 0));
   console.log("PASS parseDecision (verified shape accepted, chat shape rejected)");
+}
+
+// 8. run log sink captures per-ticket request + response; trace opt-in in response
+{
+  const runs = [];
+  const h = createHandler(() => undefined, { classify: fixtureClassify, sink: (r) => runs.push(r) });
+  const res = await call(h, "/triage", "POST", "{}");
+  const j = await res.json();
+  assert.equal(j.trace, undefined);
+  assert.equal(runs.length, 1);
+  assert.equal(runs[0].trace.filter((e) => e.stage === "tier1").length, 22);
+  const e = runs[0].trace[0];
+  assert.equal(e.request.model, "decision-model-preview");
+  assert.ok(e.request.state.ticket_id);
+  assert.ok(e.response.answers.intent);
+  assert.ok(runs[0].runId && runs[0].at);
+  const res2 = await call(h, "/triage", "POST", JSON.stringify({ includeTrace: true }));
+  const j2 = await res2.json();
+  assert.equal(j2.trace.filter((t) => t.stage === "tier1").length, 22);
+  console.log("PASS run log sink (per-ticket request/response) + includeTrace opt-in");
+}
+
+// 9. M2: tier2 lanes produce summaries, warranted analyses, brief section, trace stages
+{
+  const h = createHandler(() => undefined, {
+    classify: fixtureClassify,
+    tier2: { summarize: fixtureSummarize, analyze: fixtureAnalyze },
+  });
+  const res = await call(h, "/triage", "POST", "{}");
+  const j = await res.json();
+  const cand = j.tickets.find((t) => t.id === "ZT-1015");
+  assert.ok(cand.summary && cand.summary.length > 0);
+  const human = j.humanQueue.find((x) => x.id === "ZT-1017");
+  assert.ok(human.summary && human.summary.length > 0);
+  assert.ok(j.analyses.length >= 1);
+  assert.ok(j.analyses.every((a) => a.note.includes("Model-generated")));
+  assert.ok(j.brief.includes("TIER 2 FINDINGS"));
+  assert.ok(j.stats.tier2.light.calls > 0 && j.stats.tier2.heavy.calls > 0);
+  const res2 = await call(h, "/triage", "POST", JSON.stringify({ includeTrace: true }));
+  const j2 = await res2.json();
+  assert.ok(j2.trace.some((t) => t.stage === "tier2_light"));
+  assert.ok(j2.trace.some((t) => t.stage === "tier2_heavy" && t.clusterKey));
+  console.log("PASS M2 tier2 lanes (summaries, warranted analyses, brief section, trace stages)");
+}
+
+// 10. M3 cost math: routed below baseline, savings in range
+{
+  const { computeCost, DEFAULT_RATES, laneCosts } = await import("../src/cost.ts");
+  const stats = {
+    tickets: 22,
+    tier1Calls: 22,
+    inputTokens: 4688,
+    avgLatencyMs: 400,
+    lanes: { direct: 11 },
+    patterns: 2,
+    errors: 0,
+    tier2: {
+      light: { calls: 11, inputTokens: 1271, outputTokens: 2312, avgLatencyMs: 3000 },
+      heavy: { calls: 3, inputTokens: 1145, outputTokens: 2066, avgLatencyMs: 16000 },
+    },
+  };
+  const c = computeCost(stats, DEFAULT_RATES);
+  assert.ok(c.routed > 0);
+  assert.ok(c.baseline > c.routed);
+  assert.ok(c.savingsPct > 0 && c.savingsPct < 100);
+  const lc = laneCosts(stats, DEFAULT_RATES);
+  assert.ok(lc.direct === 0);
+  assert.ok(Math.abs(lc.tier1 + lc.flash + lc.max - c.routed) < 1e-9);
+  console.log("PASS M3 cost math (routed < baseline, savings in range, lane costs sum to routed)");
 }
 
 console.log("ALL CHECKS PASSED");

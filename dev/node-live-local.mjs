@@ -3,10 +3,17 @@
 // Create .env yourself from .env.example; never commit it, never paste values in chat.
 // Stop the fixture server (dev/node-function-local.mjs) first — both use port 8000.
 import { createServer } from "node:http";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { createHandler } from "../server/handler.ts";
 
 const env = (name) => process.env[name];
-const handler = createHandler(env);
+const sink = (record) => {
+  mkdirSync("logs", { recursive: true });
+  const file = `logs/triage-${record.at.replace(/[:.]/g, "-")}-${record.runId.slice(0, 8)}.json`;
+  writeFileSync(file, JSON.stringify(record, null, 2));
+  console.log("triage run logged:", file);
+};
+const handler = createHandler(env, { sink });
 
 function readBody(req) {
   return new Promise((resolve, reject) => {

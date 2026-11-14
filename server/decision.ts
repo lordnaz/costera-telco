@@ -4,8 +4,11 @@
 // RESPONSE parsing follows the verified shape in BOUNTY_BRIEF.md:
 //   { model, request_id, answers: { <field>: { type, choice, confidence, probabilities } },
 //     usage: { input_tokens }, latency_ms }
-// REQUEST contract is NOT yet verified with the owner — it is isolated in
-// buildDecisionRequest() below so live wiring is a one-function change.
+// REQUEST contract owner-verified: POST {base}/systemone with
+//   { model, state: { ticket_id, content }, questions: { <field>: { type, instructions, criteria } } }
+// M1 asks choice-type questions only; score/noul response shapes are verified in M2.
+// Each Decision carries `request` (body sent) and `raw` (response received) for run logs.
+// Logs must never include headers, the API key, or the endpoint hostname.
 
 import type { Ticket } from "./data.ts";
 
@@ -21,6 +24,8 @@ export interface Decision {
   inputTokens: number | null;
   latencyMs: number | null;
   requestId: string | null;
+  request: unknown;
+  raw: unknown;
 }
 
 export type ClassifyFn = (ticket: Ticket) => Promise<Decision>;
@@ -32,9 +37,11 @@ export const COMPLEXITY_CHOICES = ["routine", "complex"];
 
 export class DecisionError extends Error {
   code: string;
+  request: unknown;
   constructor(code: string, message: string) {
     super(message);
     this.code = code;
+    this.request = null;
   }
 }
 
@@ -72,13 +79,12 @@ export function parseDecision(json: unknown, fallbackLatencyMs: number): Decisio
     inputTokens: usage && typeof usage.input_tokens === "number" ? usage.input_tokens : null,
     latencyMs: typeof obj.latency_ms === "number" ? obj.latency_ms : fallbackLatencyMs,
     requestId: typeof obj.request_id === "string" ? obj.request_id : null,
+    request: null,
+    raw: json,
   };
 }
 
-// Request contract owner-verified: POST {base}/systemone with
-// { model, state: { ticket_id, content }, questions: { <field>: { type, instructions, criteria } } }.
-// M1 asks choice-type questions only; score/noul response shapes are verified in M2.
-function buildDecisionRequest(ticket: Ticket): { endpointPath: string; body: unknown } {
+export function buildDecisionRequest(ticket: Ticket): { endpointPath: string; body: unknown } {
   return {
     endpointPath: "systemone",
     body: {
@@ -133,29 +139,36 @@ export function createDecisionClassifier(env: EnvReader): ClassifyFn {
     const endpoint = new URL(endpointPath, href);
 
     const started = Date.now();
-    let res: Response;
     try {
-      res = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${key}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(20000),
-      });
-    } catch {
-      throw new DecisionError("upstream_unreachable", "Classification service is unreachable.");
+      let res: Response;
+      try {
+        res = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${key}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(20000),
+        });
+      } catch {
+        throw new DecisionError("upstream_unreachable", "Classification service is unreachable.");
+      }
+      if (!res.ok) {
+        throw new DecisionError("upstream_error", `Classification service returned HTTP ${res.status}.`);
+      }
+      let json: unknown;
+      try {
+        json = await res.json();
+      } catch {
+        throw new DecisionError("decision_contract_mismatch", "Classification service returned non-JSON.");
+      }
+      const decision = parseDecision(json, Date.now() - started);
+      decision.request = body;
+      return decision;
+    } catch (e) {
+      if (e instanceof DecisionError) e.request = body;
+      throw e;
     }
-    if (!res.ok) {
-      throw new DecisionError("upstream_error", `Classification service returned HTTP ${res.status}.`);
-    }
-    let json: unknown;
-    try {
-      json = await res.json();
-    } catch {
-      throw new DecisionError("decision_contract_mismatch", "Classification service returned non-JSON.");
-    }
-    return parseDecision(json, Date.now() - started);
   };
 }
