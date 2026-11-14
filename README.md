@@ -45,8 +45,9 @@ names, branding, customer data or employer systems are used.
   copy `.env.example` and fill in values yourself. Never commit or paste real values.
 
 The decision-model **response** parsing follows the verified shape (`answers.<field>.choice /
-.confidence / .probabilities`). The **request** contract is isolated in
-`server/decision.ts → buildDecisionRequest()` and is pending owner verification.
+.confidence / .probabilities`). The request contract is owner-verified: `POST {base}/systemone`
+with `{ model, state, questions }` (choice-type questions in M1), built in
+`server/decision.ts → buildDecisionRequest()`. Flash/max use `{base}/chat/completions`.
 
 ## Local development
 
@@ -63,6 +64,13 @@ Real Workers runtime check (needs `npm run build` first; secrets via `.dev.vars`
 
 ```sh
 npm run dev:cf                     # wrangler pages dev on 127.0.0.1:8001
+```
+
+Live local test against the real API (create `.env` yourself first; never commit it):
+
+```sh
+node --env-file=.env dev/probe-contract.mjs    # one-off request-contract discovery
+node --env-file=.env dev/node-live-local.mjs   # real Tier 1 on :8000 (stop fixture server first)
 ```
 
 Checks:

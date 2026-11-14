@@ -75,16 +75,38 @@ export function parseDecision(json: unknown, fallbackLatencyMs: number): Decisio
   };
 }
 
-// UNVERIFIED request contract — confirm path + payload with the owner before live use.
+// Request contract owner-verified: POST {base}/systemone with
+// { model, state: { ticket_id, content }, questions: { <field>: { type, instructions, criteria } } }.
+// M1 asks choice-type questions only; score/noul response shapes are verified in M2.
 function buildDecisionRequest(ticket: Ticket): { endpointPath: string; body: unknown } {
   return {
-    endpointPath: "decisions",
+    endpointPath: "systemone",
     body: {
       model: DECISION_MODEL,
-      input: ticket.text,
-      schema: {
-        intent: { type: "choice", choices: INTENT_CHOICES },
-        complexity: { type: "choice", choices: COMPLEXITY_CHOICES },
+      state: { ticket_id: ticket.id, content: ticket.text },
+      questions: {
+        intent: {
+          type: "choice",
+          instructions:
+            "Classify the ticket's primary intent into exactly one category. Pick the best-fitting specific category; use 'other' only if the text truly fits none of them.",
+          criteria: {
+            billing:
+              "Anything about money: bills, charges, fees, proration, plan-change costs, payments, refunds, credits",
+            technical:
+              "Anything about service working: no data, no signal, outages, slow connection, SIM or device faults",
+            account: "Questions about account state: balance, current plan, bill due dates, account status",
+            roaming: "Travel, roaming add-on activation and international usage",
+            other: "Only if the ticket fits none of the above, e.g. vague or unrelated text",
+          },
+        },
+        complexity: {
+          type: "choice",
+          instructions: "How complex is resolving this ticket?",
+          criteria: {
+            routine: "Answerable by a deterministic lookup or a standard procedure",
+            complex: "Needs cross-ticket analysis or judgement beyond a lookup",
+          },
+        },
       },
     },
   };
