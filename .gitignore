@@ -1,0 +1,29 @@
+# Secrets — never commit real credentials
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Logs
+*.log
+*.tsbuildinfo
+
+# Cloudflare / wrangler local state and secrets
+.wrangler/
+.dev.vars
+.dev.vars.*
+
+# Local planning brief — contains employer references, never publish
+BOUNTY_BRIEF.md
+
+# Session artifacts
+_output/
+
+# OS / editor
+.DS_Store
+Thumbs.db
