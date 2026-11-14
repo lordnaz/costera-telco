@@ -354,7 +354,7 @@ function ModelsAndCost({ stats }: { stats: TriageStats | null }) {
                   <span className="font-mono text-xs font-semibold text-foreground">${cost.baseline.toFixed(4)}</span>
                 </div>
                 <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted">
-                  <div className="h-full w-full rounded-full bg-slate-300 dark:bg-slate-700" />
+                  <div className="h-full w-full rounded-full bg-red-400 dark:bg-red-500" />
                 </div>
               </div>
             </div>
