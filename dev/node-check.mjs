@@ -312,9 +312,10 @@ async function call(handler, path, method = "GET", body) {
   console.log("PASS per-model pricing (all-flagship = baseline, tiered cheaper, custom fallback)");
 }
 
-// 14. JEFF classifier option: decision-contract only, excluded from Tier 2, priced
+// 14. Model catalogue: classifier-only stays off the chat lists, and BOTH Tier 2 lanes list the
+//     full chat catalogue (light → flagship), so any model can serve any tier.
 {
-  const { MODELS, DECISION_CONTRACT_OPTIONS, LIGHT_OPTIONS, HEAVY_OPTIONS } = await import("../src/models.ts");
+  const { MODELS, DECISION_CONTRACT_OPTIONS, CHAT_OPTIONS, RECOMMENDED_BY_TIER } = await import("../src/models.ts");
   const { ratesForModels } = await import("../src/cost.ts");
   const jeff = MODELS.find((m) => m.id === "jeff");
   assert.ok(jeff && jeff.classifierOnly);
@@ -322,13 +323,20 @@ async function call(handler, path, method = "GET", body) {
     MODELS.filter((m) => m.recommended).map((m) => m.id).join(","),
     "decision-model-preview,qwen3.8-flash,qwen3.8-max",
   );
+  assert.deepEqual(RECOMMENDED_BY_TIER.decision, ["decision-model-preview", "jeff"]);
+  assert.deepEqual(RECOMMENDED_BY_TIER.flash, ["qwen3.8-flash"]);
+  assert.deepEqual(RECOMMENDED_BY_TIER.max, ["qwen3.8-max"]);
   assert.ok(DECISION_CONTRACT_OPTIONS.some((m) => m.id === "jeff"));
-  assert.ok(!LIGHT_OPTIONS.some((m) => m.id === "jeff"));
-  assert.ok(!HEAVY_OPTIONS.some((m) => m.id === "jeff"));
-  const r = ratesForModels({ decision: "jeff", flash: "qwen3.8-flash", max: "qwen3.8-max" });
+  assert.ok(!CHAT_OPTIONS.some((m) => m.classifierOnly), "classifier-only models must stay off chat lists");
+  for (const id of ["qwen3.8-flash", "qwen3.8-max", "deepseek-chat", "claude-opus-4-5", "kimi-k2-thinking"]) {
+    assert.ok(CHAT_OPTIONS.some((m) => m.id === id), `Tier 2 lists must include ${id}`);
+  }
+  const r = ratesForModels({ decision: "jeff", flash: "qwen3.8-max", max: "qwen3.8-flash" });
   assert.equal(r.decisionIn, 0.3);
   assert.equal(r.decisionOut, 0.6);
-  console.log("PASS JEFF classifier option (decision-contract only, excluded from Tier 2, priced)");
+  assert.equal(r.flashIn, 1.6); // flagship priced on the light lane
+  assert.equal(r.maxIn, 0.1); // light priced on the heavy lane
+  console.log("PASS model catalogue (classifier-only off chat lists, both Tier 2 lanes list light + flagship)");
 }
 
 console.log("ALL CHECKS PASSED");

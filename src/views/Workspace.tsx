@@ -27,14 +27,7 @@ import { postJson } from "../api";
 import { computeCost, ratesForModels } from "../cost";
 import { decisionReady, effective, effectiveModel, emptyCreds, sessionActive, TIERS } from "../credentials";
 import type { SessionCreds, TierEntry, TierId } from "../credentials";
-import {
-  CLASSIFIER_CHAT_OPTIONS,
-  DECISION_CONTRACT_OPTIONS,
-  families,
-  HEAVY_OPTIONS,
-  isRecommended,
-  LIGHT_OPTIONS,
-} from "../models";
+import { CHAT_OPTIONS, DECISION_CONTRACT_OPTIONS, families, isRecommendedFor } from "../models";
 import type { CatalogModel } from "../models";
 import type { Desk } from "../components/bits";
 import { EmptyState, idleTest, InfoNote, ModelName, SectionCard, TicketChip, usd } from "../components/bits";
@@ -79,10 +72,10 @@ export function HumanView({ desk }: { desk: Desk }) {
       <EmptyState
         icon={Users}
         title="No run yet"
-        sub="Run triage to build the human review queue. Low-confidence tickets and anything touching credits or refunds land here — never auto-resolved."
+        sub="Run triage on Overview to build the human review queue. Low-confidence tickets and anything touching credits or refunds land here — never auto-resolved."
         action={
-          <Button size="sm" disabled={!desk.canRun} onClick={desk.run}>
-            Run triage
+          <Button size="sm" variant="outline" onClick={() => desk.setView("overview")}>
+            <ArrowRight /> Open Overview
           </Button>
         }
       />
@@ -139,10 +132,10 @@ export function PatternsView({ desk }: { desk: Desk }) {
       <EmptyState
         icon={BarChart3}
         title="No patterns yet"
-        sub="Run triage to cluster the synthetic batch into evidenced recurring patterns (3+ tickets per cluster)."
+        sub="Run triage on Overview to cluster the synthetic batch into evidenced recurring patterns (3+ tickets per cluster)."
         action={
-          <Button size="sm" disabled={!desk.canRun} onClick={desk.run}>
-            Run triage
+          <Button size="sm" variant="outline" onClick={() => desk.setView("overview")}>
+            <ArrowRight /> Open Overview
           </Button>
         }
       />
@@ -210,8 +203,8 @@ export function FindingsView({ desk }: { desk: Desk }) {
         title="No AI findings yet"
         sub="Run triage; Max analyses only clusters that warrant it (high-volume, or containing unsure/candidate tickets)."
         action={
-          <Button size="sm" disabled={!desk.canRun} onClick={desk.run}>
-            Run triage
+          <Button size="sm" variant="outline" onClick={() => desk.setView("overview")}>
+            <ArrowRight /> Open Overview
           </Button>
         }
       />
@@ -277,8 +270,8 @@ export function BriefView({ desk }: { desk: Desk }) {
         title="No draft yet"
         sub="The escalation brief is assembled deterministically from evidence after a triage run."
         action={
-          <Button size="sm" disabled={!desk.canRun} onClick={desk.run}>
-            Run triage
+          <Button size="sm" variant="outline" onClick={() => desk.setView("overview")}>
+            <ArrowRight /> Open Overview
           </Button>
         }
       />
@@ -398,10 +391,10 @@ export function HistoryView({ desk }: { desk: Desk }) {
         <EmptyState
           icon={History}
           title="No runs in this session"
-          sub="Each triage run records per-ticket Tier 1/Tier 2 requests and responses. Run triage to start the history."
+          sub="Each triage run records per-ticket Tier 1/Tier 2 requests and responses. Run triage on Overview to start the history."
           action={
-            <Button size="sm" disabled={!desk.canRun} onClick={desk.run}>
-              Run triage
+            <Button size="sm" variant="outline" onClick={() => desk.setView("overview")}>
+              <ArrowRight /> Open Overview
             </Button>
           }
         />
@@ -666,15 +659,16 @@ function ByoAccess({ desk }: { desk: Desk }) {
       setTier(id, { model: v });
     }
   };
-  const modelOptions = (list: CatalogModel[]) =>
+  const modelOptions = (tier: TierId, list: CatalogModel[]) =>
     families(list).map((f) => (
-      <optgroup key={f} label={f === "Qwen" ? "Qwen · recommended (verified end-to-end)" : f}>
+      <optgroup key={f} label={f === "Qwen" ? "Qwen · verified end-to-end" : f}>
         {list
           .filter((m) => m.family === f)
           .map((m) => (
             <option key={m.id} value={m.id}>
+              {isRecommendedFor(tier, m.id) ? "★ " : ""}
               {m.id} · {m.role}
-              {m.recommended ? " · recommended" : ""}
+              {isRecommendedFor(tier, m.id) ? " (Recommended)" : ""}
             </option>
           ))}
       </optgroup>
@@ -798,8 +792,11 @@ function ByoAccess({ desk }: { desk: Desk }) {
         <InfoNote>
           Provider-agnostic: any OpenAI-compatible endpoint works — Qwen MaaS, DeepSeek, OpenAI, Anthropic
           (OpenAI-compat layer), Moonshot/Kimi and others. Dropdowns list popular demo models only; choose Custom for
-          anything else. The classifier choice never changes the Tier 2 selections, so you can price an all-flagship
-          run against a tiered run in Cost analytics.
+          anything else. ★ and the (Recommended) tag mark the model recommended for that tier —
+          <b> decision-model-preview</b> or <b>jeff</b> for Tier 1, <b>qwen3.8-flash</b> for Tier 2
+          light, <b>qwen3.8-max</b> for Tier 2 heavy. The classifier choice
+          never changes the Tier 2 selections, so you can price an all-flagship run against a tiered run in Cost
+          analytics.
         </InfoNote>
         <div className="grid gap-3 lg:grid-cols-2">
           <label className="block">
@@ -841,7 +838,7 @@ function ByoAccess({ desk }: { desk: Desk }) {
                   ) : (
                     <span className="text-xs italic text-muted-foreground">no selection</span>
                   )}
-                  {isRecommended(effectiveModel(desk.creds, t.id)) && (
+                  {isRecommendedFor(t.id, effectiveModel(desk.creds, t.id)) && (
                     <span className="rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-medium text-teal-700 dark:bg-teal-950/60 dark:text-teal-300">
                       recommended
                     </span>
@@ -865,24 +862,26 @@ function ByoAccess({ desk }: { desk: Desk }) {
                       className="w-full rounded-lg border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-teal-500"
                     >
                       <option value="__none">No selection — choose a model</option>
-                      <optgroup label="Decision contract · /systemone">
+                      <optgroup label="Decision contract · /systemone (recommended for Tier 1)">
                         {DECISION_CONTRACT_OPTIONS.map((m) => (
                           <option key={m.id} value={`systemone:${m.id}`}>
+                            {isRecommendedFor("decision", m.id) ? "★ " : ""}
                             {m.name ? `${m.name} · ` : ""}
                             {m.id} · calibrated probabilities
-                            {m.recommended ? " · recommended" : ""}
+                            {isRecommendedFor("decision", m.id) ? " (Recommended)" : ""}
                           </option>
                         ))}
                       </optgroup>
-                      {families(CLASSIFIER_CHAT_OPTIONS).map((f) => (
+                      {families(CHAT_OPTIONS).map((f) => (
                         <optgroup
                           key={f}
-                          label={f === "Qwen" ? "Chat classifier · Qwen (recommended)" : `Chat classifier · ${f}`}
+                          label={f === "Qwen" ? "Chat classifier · Qwen (verified end-to-end)" : `Chat classifier · ${f}`}
                         >
-                          {CLASSIFIER_CHAT_OPTIONS.filter((m) => m.family === f).map((m) => (
+                          {CHAT_OPTIONS.filter((m) => m.family === f).map((m) => (
                             <option key={m.id} value={`chat:${m.id}`}>
+                              {isRecommendedFor("decision", m.id) ? "★ " : ""}
                               {m.id} · {m.role}
-                              {m.recommended ? " · recommended" : ""}
+                              {isRecommendedFor("decision", m.id) ? " (Recommended)" : ""}
                             </option>
                           ))}
                         </optgroup>
@@ -897,7 +896,7 @@ function ByoAccess({ desk }: { desk: Desk }) {
                       className="w-full rounded-lg border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-teal-500"
                     >
                       <option value="__none">No selection — choose a model</option>
-                      {modelOptions(t.id === "flash" ? LIGHT_OPTIONS : HEAVY_OPTIONS)}
+                      {modelOptions(t.id, CHAT_OPTIONS)}
                       <option value="__custom">Custom model ID…</option>
                     </select>
                   )}

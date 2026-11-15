@@ -1,48 +1,9 @@
 import architectureUrl from "@/docs/architecture.png";
-import { ArrowRight, BookOpen, Expand, Layers, Play, Route, ScanSearch, Settings2, ShieldCheck, Sparkles } from "lucide-react";
+import stepByStepUrl from "@/docs/step-by-step.png";
+import { ArrowRight, Expand, Layers, ScanSearch, Settings2, ShieldCheck, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Desk } from "../components/bits";
 import { InfoNote, SectionCard } from "../components/bits";
-
-const STAGES: { icon: typeof Layers; label: string; tone: string; points: string[] }[] = [
-  {
-    icon: Layers,
-    label: "1 · Input",
-    tone: "bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300",
-    points: [
-      "A batch of synthetic support tickets for ZephyrTel, a fictional telco.",
-      "Nothing real: no customer data, no employer systems, no live network feeds.",
-    ],
-  },
-  {
-    icon: Route,
-    label: "2 · Orchestration",
-    tone: "bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300",
-    points: [
-      "The orchestrator validates the request and asks Tier 1 to classify each ticket.",
-      "A policy then picks the cheapest lane that can handle it, at a 70% confidence floor.",
-    ],
-  },
-  {
-    icon: ScanSearch,
-    label: "3 · Routing & execution",
-    tone: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
-    points: [
-      "Direct / code lane answers lookups from the knowledge base — zero generated tokens.",
-      "Tier 2 light summarises the escalation set; Tier 2 heavy reads a whole cluster, only when warranted.",
-      "Anything unsure, or touching credits and refunds, goes to a human — never auto-resolved.",
-    ],
-  },
-  {
-    icon: BookOpen,
-    label: "4 · Output",
-    tone: "bg-teal-50 text-teal-700 dark:bg-teal-950/50 dark:text-teal-300",
-    points: [
-      "Recurring patterns with ticket IDs, quoted lines, counts and confidence.",
-      "A draft escalation brief an agent can edit, plus a cost readout of the run.",
-    ],
-  },
-];
 
 const PRINCIPLES: { icon: typeof Sparkles; title: string; body: string }[] = [
   {
@@ -68,7 +29,6 @@ const PRINCIPLES: { icon: typeof Sparkles; title: string; body: string }[] = [
 ];
 
 export function HowItWorks({ desk }: { desk: Desk }) {
-  const runLabel = desk.result ? "Triage complete" : desk.running ? "Triaging…" : `Run triage · ${desk.batch?.tickets.length ?? 0}`;
   return (
     <div className="space-y-5">
       <SectionCard
@@ -87,16 +47,6 @@ export function HowItWorks({ desk }: { desk: Desk }) {
           patterns, a draft escalation brief, and an honest estimate of what the routing saved.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            onClick={() => {
-              desk.run();
-              desk.setView("overview");
-            }}
-            disabled={!desk.canRun}
-          >
-            <Play /> {runLabel}
-          </Button>
           <Button size="sm" variant="outline" onClick={() => desk.setView("overview")}>
             <ArrowRight /> Open the desk
           </Button>
@@ -139,25 +89,32 @@ export function HowItWorks({ desk }: { desk: Desk }) {
         </InfoNote>
       </SectionCard>
 
-      <SectionCard title="Step by step" sub="The four columns of the diagram, in order">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {STAGES.map((s) => (
-            <div key={s.label} className="rounded-lg border bg-card p-3">
-              <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold ${s.tone}`}>
-                <s.icon className="size-3.5" />
-                {s.label}
-              </span>
-              <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-muted-foreground">
-                {s.points.map((p) => (
-                  <li key={p} className="flex gap-1.5">
-                    <span className="mt-1.5 size-1 shrink-0 rounded-full bg-teal-500" />
-                    <span>{p}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
+      <SectionCard
+        title="Step by step"
+        sub="Input → orchestration → routing & execution → output"
+        action={
+          <a href={stepByStepUrl} target="_blank" rel="noreferrer">
+            <Button size="sm" variant="ghost">
+              <Expand /> Open full size
+            </Button>
+          </a>
+        }
+      >
+        <a
+          href={stepByStepUrl}
+          target="_blank"
+          rel="noreferrer"
+          title="Open full size in a new tab"
+          className="block w-full overflow-hidden rounded-lg border bg-white p-2 transition-shadow hover:shadow-md"
+        >
+          <img
+            src={stepByStepUrl}
+            alt="Four steps in order. Step 1 Input: a batch of synthetic support tickets for ZephyrTel, a fictional telco; no real customer data, employer systems or live network feeds. Step 2 Orchestration: validate the request and classify each ticket with Tier 1, then select the cheapest capable lane at a 70% confidence floor. Step 3 Routing and execution: direct code lane knowledge-base lookups with zero generative-model tokens; Tier 2 summarises escalations or analyses clusters only when warranted; human review for uncertain cases, credits and refunds, never auto-resolved. Step 4 Output: evidence-backed patterns with ticket IDs, quotes, counts and confidence, plus an editable escalation brief and a cost readout for the run."
+            className="mx-auto w-full max-w-5xl"
+            loading="lazy"
+            decoding="async"
+          />
+        </a>
       </SectionCard>
 
       <SectionCard title="Why it is built this way" sub="Four rules the routing follows">
@@ -202,8 +159,9 @@ export function HowItWorks({ desk }: { desk: Desk }) {
               n: "3",
               body: (
                 <>
-                  Press <span className="font-medium">Run triage</span>. The desk classifies all tickets, routes them,
-                  and fills Overview, Evidence &amp; patterns, Escalation brief and Cost analytics.
+                  On <span className="font-medium">Overview</span> (or Ticket inbox) press
+                  <span className="font-medium"> Run triage</span> in the top-right. The desk classifies all tickets,
+                  routes them, and fills Overview, Evidence &amp; patterns, Escalation brief and Cost analytics.
                 </>
               ),
             },

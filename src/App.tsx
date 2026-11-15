@@ -381,45 +381,51 @@ export default function App() {
               <p className="mt-1 text-sm text-muted-foreground">{TITLES[view][1]}</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" disabled={!result} onClick={() => openLog()} title={result ? "Per-ticket request/response trace of the latest run" : "Run triage first"}>
-                <FileText /> View run log
-              </Button>
-              <Button
-                onClick={run}
-                disabled={!canRun}
-                size="sm"
-                className={
-                  result
-                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-600/25 hover:from-emerald-500 hover:to-teal-500 disabled:shadow-none"
-                    : "bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-md shadow-teal-600/25 hover:from-teal-500 hover:to-emerald-500 disabled:shadow-none"
-                }
-                title={
-                  result
-                    ? "Triage already completed — reload the page to run again"
-                    : health?.mode === "live" && !health.configured
-                      ? "Opens a setup checklist until all three tiers are configured and Test-confirmed"
-                      : undefined
-                }
-              >
-                {result ? <Check /> : running ? <Loader2 className="animate-spin" /> : <Play />}
-                {result ? "Triage complete" : running ? "Triaging…" : `Run triage · ${batch?.tickets.length ?? 0}`}
-              </Button>
+              {(view === "overview" || view === "tickets" || view === "history") && (
+                <Button variant="outline" size="sm" disabled={!result} onClick={() => openLog()} title={result ? "Per-ticket request/response trace of the latest run" : "Run triage first"}>
+                  <FileText /> View run log
+                </Button>
+              )}
+              {(view === "overview" || view === "tickets") && (
+                <Button
+                  onClick={run}
+                  disabled={!canRun}
+                  size="sm"
+                  className={
+                    result
+                      ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-600/25 hover:from-emerald-500 hover:to-teal-500 disabled:shadow-none"
+                      : "bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-md shadow-teal-600/25 hover:from-teal-500 hover:to-emerald-500 disabled:shadow-none"
+                  }
+                  title={
+                    result
+                      ? "Triage already completed — reload the page to run again"
+                      : health?.mode === "live" && !health.configured
+                        ? "Opens a setup checklist until all three tiers are configured and Test-confirmed"
+                        : undefined
+                  }
+                >
+                  {result ? <Check /> : running ? <Loader2 className="animate-spin" /> : <Play />}
+                  {result ? "Triage complete" : running ? "Triaging…" : `Run triage · ${batch?.tickets.length ?? 0}`}
+                </Button>
+              )}
             </div>
           </div>
 
-          <div
-            role="note"
-            className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-900 shadow-xs dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
-          >
-            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-            <p>
-              <span className="font-semibold">Demo environment — synthetic demo data.</span> All tickets, customers,
-              plans and outages are fictional; patterns are observations in synthetic data — not verified network
-              truth. No real customer information. <span className="font-semibold">No persistence yet:</span> this build
-              has no database, so a page refresh resets the desk — the run, findings, brief, marks and history are gone
-              and your API access must be entered again in Settings.
-            </p>
-          </div>
+          {view !== "how" && (
+            <div
+              role="note"
+              className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-900 shadow-xs dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
+            >
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+              <p>
+                <span className="font-semibold">Demo environment — synthetic demo data.</span> All tickets, customers,
+                plans and outages are fictional; patterns are observations in synthetic data — not verified network
+                truth. No real customer information. <span className="font-semibold">No persistence yet:</span> this build
+                has no database, so a page refresh resets the desk — the run, findings, brief, marks and history are gone
+                and your API access must be entered again in Settings.
+              </p>
+            </div>
+          )}
 
           {health?.mode === "fixture" && (
             <Alert className="border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
@@ -428,17 +434,6 @@ export default function App() {
               <AlertDescription>
                 Classifier responses are simulated fixtures, not live model calls. The published site calls real
                 models using the API access each reviewer enters in Settings.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {health && health.mode === "live" && !health.configured && !byo && (
-            <Alert>
-              <ShieldAlert />
-              <AlertTitle>No API access yet</AlertTitle>
-              <AlertDescription>
-                This deployment holds no server-side key — every run uses your own access. Open Settings and enter your
-                session API key, endpoint and model per tier (memory-only, cleared on refresh).
               </AlertDescription>
             </Alert>
           )}
@@ -465,9 +460,11 @@ export default function App() {
               <AlertDescription>
                 {error}
                 <div className="mt-2">
-                  <Button variant="outline" size="sm" onClick={run} disabled={!canRun}>
-                    Retry
-                  </Button>
+                  {(view === "overview" || view === "tickets") && (
+                    <Button variant="outline" size="sm" onClick={run} disabled={!canRun}>
+                      Retry
+                    </Button>
+                  )}
                 </div>
               </AlertDescription>
             </Alert>

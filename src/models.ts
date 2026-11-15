@@ -12,6 +12,7 @@ export interface CatalogModel {
   in: number;
   out: number;
   classifierOnly?: boolean;
+  // part of the Qwen trio verified end-to-end; per-tier stars come from RECOMMENDED_BY_TIER
   recommended?: boolean;
 }
 
@@ -35,15 +36,25 @@ export const DEFAULT_CHAT_CLASSIFIER = "deepseek-chat";
 
 export const modelById = (id: string): CatalogModel | undefined => MODELS.find((m) => m.id === id);
 
-export const isRecommended = (id: string): boolean => Boolean(modelById(id)?.recommended);
+// Recommended picks are PER TIER, not per model: Tier 1 is the calibrated decision contract,
+// Tier 2 light is the cheap flash lane, Tier 2 heavy is the flagship analysis lane. The UI
+// marks these with a star in the dropdowns.
+export type TierKey = "decision" | "flash" | "max";
+export const RECOMMENDED_BY_TIER: Record<TierKey, string[]> = {
+  decision: ["decision-model-preview", "jeff"],
+  flash: ["qwen3.8-flash"],
+  max: ["qwen3.8-max"],
+};
+
+export const isRecommendedFor = (tier: TierKey, id: string): boolean => RECOMMENDED_BY_TIER[tier].includes(id);
 
 export const families = (list: CatalogModel[]): string[] => [...new Set(list.map((m) => m.family))];
 
-// Tier 2 lists never include the classifier-only decision models.
+// Tier 1 offers the decision contract plus every chat model; Tier 2 light and Tier 2 heavy
+// both list the SAME full chat catalogue (light, mid and flagship), so a reviewer can point
+// any tier at any model. Only the classifier-only decision models stay off the chat lists.
 export const DECISION_CONTRACT_OPTIONS = MODELS.filter((m) => m.classifierOnly);
-export const LIGHT_OPTIONS = MODELS.filter((m) => !m.classifierOnly && (m.role === "light" || m.role === "mid"));
-export const HEAVY_OPTIONS = MODELS.filter((m) => !m.classifierOnly && (m.role === "mid" || m.role === "flagship"));
-export const CLASSIFIER_CHAT_OPTIONS = MODELS.filter((m) => !m.classifierOnly);
+export const CHAT_OPTIONS = MODELS.filter((m) => !m.classifierOnly);
 
 export interface RunModels {
   decision: string;
