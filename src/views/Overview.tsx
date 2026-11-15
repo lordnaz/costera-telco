@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   ArrowRight,
   BarChart3,
+  BookOpen,
   ChevronDown,
   ClipboardList,
   Clock,
@@ -13,6 +14,7 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
+import architectureUrl from "@/docs/architecture.png";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { computeCost, ratesForModels } from "../cost";
@@ -32,6 +34,7 @@ const TABS: { view: Desk["view"]; label: (d: Desk) => string }[] = [
 export function Overview({ desk }: { desk: Desk }) {
   const { result, batch } = desk;
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [howOpen, setHowOpen] = useState(false);
   const cost = result ? computeCost(result.stats, ratesForModels(result.models)) : null;
   const selectedTicket = batch?.tickets.find((t) => t.id === desk.selected);
   const selectedTr = result?.tickets.find((t) => t.id === desk.selected);
@@ -41,6 +44,58 @@ export function Overview({ desk }: { desk: Desk }) {
 
   return (
     <div className="space-y-5">
+      <section className="rise rounded-xl border bg-card shadow-xs">
+        <button
+          type="button"
+          onClick={() => setHowOpen((v) => !v)}
+          aria-expanded={howOpen}
+          className="flex w-full flex-wrap items-center gap-3 px-5 py-4 text-left"
+        >
+          <span className="flex size-9 items-center justify-center rounded-lg bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300">
+            <BookOpen className="size-4" />
+          </span>
+          <span className="min-w-52 flex-1">
+            <span className="flex items-center gap-1.5 text-sm font-semibold">
+              How it works
+              <ChevronDown className={`size-4 transition-transform ${howOpen ? "rotate-180" : ""}`} />
+            </span>
+            <span className="text-xs text-muted-foreground">
+              Every ticket takes the cheapest lane that can answer it · unsure or money-touching stops at a human
+            </span>
+          </span>
+          <span className="text-xs text-muted-foreground">Synthetic data · estimated costs</span>
+        </button>
+        {howOpen && (
+          <div className="space-y-3 border-t px-5 py-4">
+            <p className="text-sm leading-relaxed">
+              Tier 1 reads intent and complexity for every ticket. A policy then sends each one to a free
+              knowledge-base lookup, a human queue, or Tier 2 — flash for summaries, Max only for clusters that
+              genuinely need cross-ticket reading. What you get back is evidence rather than opinion: ticket IDs,
+              quoted lines, counts and confidence, plus a draft escalation brief and an estimate of what the routing
+              saved.
+            </p>
+            <a
+              href={architectureUrl}
+              target="_blank"
+              rel="noreferrer"
+              title="Open full size in a new tab"
+              className="block overflow-hidden rounded-lg border bg-white p-2 transition-shadow hover:shadow-md"
+            >
+              <img
+                src={architectureUrl}
+                alt="COSTERA solution architecture: triage desk → orchestrator → cost-aware routing policy → direct code lane, human review or Tier 2 escalation → evidence-labelled output, with knowledge base, observability and cost analytics alongside."
+                className="mx-auto w-full max-w-3xl"
+                loading="lazy"
+                decoding="async"
+              />
+            </a>
+            <Button size="sm" variant="outline" onClick={() => desk.setView("how")}>
+              <BookOpen /> Full explanation and reviewer path
+            </Button>
+          </div>
+        )}
+      </section>
+
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi
           icon={ClipboardList}

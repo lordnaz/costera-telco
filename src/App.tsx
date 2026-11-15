@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   AlertTriangle,
   BarChart3,
+  BookOpen,
   Check,
   ChevronDown,
   FileText,
@@ -36,9 +37,11 @@ import type { Desk, RunRecord, TierId, TestState, View } from "./components/bits
 import { Drawer, idleTest, InfoNote, LaneBadge, ModelName, StageBadge } from "./components/bits";
 import { TicketDetail } from "./components/TicketTable";
 import { Overview } from "./views/Overview";
+import { HowItWorks } from "./views/HowItWorks";
 import { BriefView, CostView, FindingsView, HistoryView, HumanView, PatternsView, SettingsView, TicketsView } from "./views/Workspace";
 
 const NAV: { view: View; label: string; icon: typeof Home }[] = [
+  { view: "how", label: "How it works", icon: BookOpen },
   { view: "overview", label: "Overview", icon: Home },
   { view: "tickets", label: "Ticket inbox", icon: Inbox },
   { view: "human", label: "Human review", icon: Users },
@@ -49,6 +52,7 @@ const NAV: { view: View; label: string; icon: typeof Home }[] = [
 ];
 
 const TITLES: Record<View, [string, string]> = {
+  how: ["How it works", "The architecture behind the desk, and how to run your first triage."],
   overview: ["Triage desk", "Resolve routine tickets. Focus human attention where it matters."],
   tickets: ["Ticket inbox", "Every synthetic ticket in the latest batch, searchable and sortable."],
   human: ["Human review", "Low confidence or credits / refunds — never auto-resolved."],
@@ -76,7 +80,7 @@ export default function App() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [view, setView] = useState<View>("overview");
+  const [view, setView] = useState<View>("how");
   const [selected, setSelected] = useState<string | null>(null);
   const [extras, setExtras] = useState<{ ticketId: string; line: string }[]>([]);
   const [theme, setTheme] = useState(readTheme);
@@ -476,6 +480,7 @@ export default function App() {
             </InfoNote>
           )}
 
+          {view === "how" && <HowItWorks desk={desk} />}
           {view === "overview" && <Overview desk={desk} />}
           {view === "tickets" && <TicketsView desk={desk} />}
           {view === "human" && <HumanView desk={desk} />}

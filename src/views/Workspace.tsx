@@ -537,8 +537,8 @@ export function SettingsView({ desk }: { desk: Desk }) {
       <SectionCard title="Data safety" sub="What this demo never touches">
         <ul className="space-y-2 text-sm">
           <li>All tickets, customers, plans and outages are synthetic, generated from scratch.</li>
-          <li>API key and endpoint hostname are read server-side only; never in client code, repo or logs.</li>
-          <li>No real provider names, logos, customer data or employer systems.</li>
+          <li>Your session key and endpoint are used server-side for that one request only — never stored, logged or written to browser storage.</li>
+          <li>No real customer data, employer systems or live network feeds; provider names appear only as selectable model options.</li>
           <li>Run logs record request/response bodies but never keys, headers or the hostname.</li>
         </ul>
         <div className="mt-3">

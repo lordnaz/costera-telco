@@ -8,32 +8,67 @@ routing each step to the cheapest lane that can do it — and handing off to a h
 isn't sure.
 
 **All data is synthetic.** Tickets, customers, plans and outages are generated from scratch.
-Patterns are observations in synthetic data, not verified network truth. No real provider
-names, branding, customer data or employer systems are used.
+Patterns are observations in synthetic data, not verified network truth. No real customer data,
+employer systems or live network feeds are used. Provider and model names appear only as
+selectable options for your own API access — the desk itself is not branded as any real telco.
 
-## Flow (M1 walking skeleton)
+**Try it in two minutes** (your own key, your own quota):
+
+1. Open the site — it lands on **How it works**, with the architecture diagram and a short
+   explanation of the routing.
+2. **Settings → Bring your own API access**: paste your provider key and OpenAI-compatible base
+   URL, pick the three tier models (or press *Apply verified model setup*), then **Test** each tier.
+3. **Run triage**. Overview, Evidence & patterns, Escalation brief and Cost analytics fill in.
+
+Nothing is persisted, so a refresh resets the desk and the setup — see
+[State and persistence](#state-and-persistence).
+
+## Flow (M1–M3 as built)
 
 1. Agent loads the synthetic ticket batch (22 tickets).
-2. Tier 1 classifier (`decision-model-preview`) classifies intent + complexity with probabilities.
+2. Tier 1 classifies intent + complexity for every ticket. Two engines: the verified decision
+   contract (`decision-model-preview`, calibrated probabilities) or any chat model via a strict
+   JSON prompt (self-reported confidence). Settings opens on the chat engine so any provider
+   works out of the box; *Apply verified model setup* switches to the decision contract and the
+   tested Qwen trio.
 3. Routing:
    - **Direct / code lane** — deterministic lookup against a synthetic knowledge base
      (plans, accounts, known outages, procedures). No generation call.
    - **Human review** — confidence below 70%, or anything touching credits/refunds.
-   - **Tier 2 candidate** — complex with no deterministic answer (escalation itself is M2).
+   - **Tier 2 candidate** — complex with no deterministic answer; escalated by the lanes below.
 4. Output: recurring patterns with evidence (ticket IDs, quoted lines, counts, confidence),
    a per-ticket routing table, and a deterministically assembled draft escalation brief.
 
 M2 adds the escalation lanes: Tier 2 light (`qwen3.8-flash`) writes plain-language summaries
 for the escalation set (candidates + human review); Tier 2 heavy (`qwen3.8-max`) analyses
-cross-ticket clusters **only when warranted** (high-volume, or containing unsure/candidate
-tickets). Human-review handoffs carry the summaries and analysis. All Tier 2 output is
+cross-ticket clusters **only when warranted** (4+ tickets, or 2+ with unsure/candidate members;
+at most 4 analyses per run). Human-review handoffs carry the summaries and analysis, and the
+cluster analysis is shown on the ticket itself as well as under AI findings. All Tier 2 output is
 labelled model-generated in the UI, the brief and the run logs.
 
-M3 adds a merged "Models & cost routing" section: one card per lane with its tier, model
-name, role, and (after a run) calls/tokens/latency plus estimated cost. Below the cards, a
-plain-language comparison shows routed cost vs an all-Max baseline as two bars, with the
-savings percentage. Rates are fixed assumptions listed in a footnote; every figure is
-labelled an estimate, not billing truth.
+M3 adds the merged "Models & cost routing" readout: one card per lane with its tier, the model
+actually used, its role, and (after a run) calls/tokens/latency plus estimated cost. Below the
+cards, a plain-language comparison shows routed cost vs an all-flagship baseline as two bars with
+the savings percentage. Rates are **assumed per-model rates for the models that run used**, listed
+in a footnote; every figure is labelled an estimate, not billing truth.
+
+## The desk
+
+| View | What it shows |
+| --- | --- |
+| **How it works** (default landing) | Architecture diagram, the four stages, why the routing is built this way, and the reviewer start path |
+| Overview | KPIs, routing summary, worklist + ticket detail, pattern and brief previews, collapsible model/cost readout |
+| Ticket inbox | All tickets, searchable, filterable by lane, sortable, paginated |
+| Human review | The unsure / money-touching queue with summaries and cluster analysis attached |
+| Evidence & patterns | Recurring clusters with ticket IDs, quoted lines, counts and confidence |
+| AI findings | Tier 2 heavy cluster analyses, labelled model-generated |
+| Escalation brief | Deterministic draft assembled from evidence; copy for review |
+| Run history | This tab's runs with models used, key source and the full request/response trace |
+| Cost analytics | Per-run cost at that run's own model rates, plus routed vs all-flagship comparison |
+| Settings | Appearance, workspace info, routing policy, data safety, and bring-your-own API access |
+
+"Add to brief" on a ticket is a **local review mark only**: it never changes the draft, is not
+copied with the brief, and is never sent anywhere.
 
 ## Architecture
 
@@ -82,9 +117,9 @@ fixture mode (local development) is the only run that skips that step.
 Each tier also accepts a **model choice from a curated popular-model dropdown** (Qwen, DeepSeek,
 OpenAI, Anthropic, Moonshot/Kimi; plus a custom-ID escape hatch). Qwen groups list first and the
 verified Qwen trio is marked "recommended" in every dropdown and tier header. Tier 1 has a
-**classifier type dropdown**: the verified decision contract (`POST {base}/systemone`,
-`decision-model-preview` or `jeff` / JEFF where the endpoint exposes it) or any chat model as
-classifier via `POST {base}/chat/completions`. The classifier choice never applies to the Tier 2
+**classifier type dropdown** (Settings defaults to the chat engine): the verified decision
+contract (`POST {base}/systemone`, `decision-model-preview` or `jeff` / JEFF where the endpoint
+exposes it) or any chat model as classifier via `POST {base}/chat/completions`. The classifier choice never applies to the Tier 2
 lists. The chat engine uses a strict JSON prompt; its confidence is
 self-reported (no calibrated probabilities), and the 70% unsure floor and refund rules still apply.
 
@@ -145,9 +180,10 @@ npm run build                      # type-check + static build
 
 ## Run logs
 
-Every triage run produces an audit record: run ID, timestamp, mode, stats, and a per-ticket
-trace with the exact request body sent to the decision model and its raw response, plus the
-routing outcome. Logs never contain headers, the API key, or the endpoint hostname.
+Every triage run produces an audit record: run ID, timestamp, mode, `keySource`, classifier
+engine, the three model IDs actually used, stats, and a per-ticket trace with the exact request
+body sent to each lane (Tier 1, Tier 2 light, Tier 2 heavy) and its raw response, plus the routing
+outcome. Logs never contain headers, the API key, or the endpoint hostname.
 
 - Local dev servers write one pretty JSON file per run to `logs/` (gitignored).
 - Deployed Pages Functions emit one structured JSON line per run to the console
@@ -175,11 +211,13 @@ Session credentials are never persisted anywhere by choice: keeping them out of 
 makes "your key, your quota, one request at a time" true. Only non-secret state (the last run and
 its stats) would move to a durable store — Cloudflare D1 or KV keyed by batch, with the run log
 already providing the same records server-side. That is outside the current milestone, and the
-UI states the reset behaviour on the banner, Settings and Run history so nobody loses work
-without knowing.
+UI states the reset behaviour on the banner, the How it works landing view, Settings and Run
+history so nobody loses work without knowing.
 
 ## Deployment
 
 GitHub repo → **Cloudflare Pages auto-deploy**. Build command `npm run build`, output
 directory `dist`. Pages serves the static frontend and the Functions at `/api/*`, and
-provides a public `*.pages.dev` URL. Starter attribution: `PROVENANCE.md`.
+provides a public `*.pages.dev` URL. **No environment variables to set in the Pages dashboard** —
+the deployment is session-key only, so it can never spend anyone else's quota. Starter
+attribution: `PROVENANCE.md`.

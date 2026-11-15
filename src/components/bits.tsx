@@ -4,6 +4,7 @@ import type { SessionCreds } from "../credentials";
 import type { Batch, Health, TicketResult, TraceEntry, TriageResult } from "../types";
 
 export type View =
+  | "how"
   | "overview"
   | "tickets"
   | "human"
