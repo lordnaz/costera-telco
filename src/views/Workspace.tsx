@@ -856,15 +856,6 @@ function ByoAccess({ desk }: { desk: Desk }) {
             ? "Temporary reviewer access lives in this page's memory only: a refresh clears it and returns the desk to bring-your-own. There is no database in this build, so reloading also resets the desk itself — the last run, findings, brief and history disappear and triage has to be run again. The owner's key and endpoint never reach this browser."
             : "Keys and endpoints live in this page's memory only: a refresh clears them and you must enter them again. There is no database in this build, so reloading also resets the desk itself — the last run, findings, brief and history disappear and triage has to be run again. Credentials are sent to this site's server over HTTPS solely for your run — never stored, never logged, never written to disk or browser storage."}
         </InfoNote>
-        <InfoNote>
-          Provider-agnostic: any OpenAI-compatible endpoint works — Qwen MaaS, DeepSeek, OpenAI, Anthropic
-          (OpenAI-compat layer), Moonshot/Kimi and others. Dropdowns list popular demo models only; choose Custom for
-          anything else. ★ and the (Recommended) tag mark the model recommended for that tier —
-          <b> decision-model-preview</b> or <b>jeff</b> for Tier 1, <b>qwen3.8-flash</b> for Tier 2
-          light, <b>qwen3.8-max</b> for Tier 2 heavy. The classifier choice
-          never changes the Tier 2 selections, so you can price an all-flagship run against a tiered run in Cost
-          analytics.
-        </InfoNote>
         {demo ? (
           <div className="flex items-center gap-2.5 rounded-lg border border-dashed px-3.5 py-2.5 text-xs text-muted-foreground">
             <Lock className="size-4 shrink-0" />
