@@ -1,5 +1,6 @@
 import architectureUrl from "@/docs/architecture.png";
 import stepByStepUrl from "@/docs/step-by-step.png";
+import whatItIsForUrl from "@/docs/what-it-is-for.png";
 import { ArrowRight, Expand, Layers, ScanSearch, Settings2, ShieldCheck, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Desk } from "../components/bits";
@@ -32,20 +33,31 @@ export function HowItWorks({ desk }: { desk: Desk }) {
   return (
     <div className="space-y-5">
       <SectionCard
-        title={
-          <>
-            The 30-second version <span className="text-muted-foreground text-sm font-normal">— what this desk does to a batch of tickets</span>
-          </>
+        title="What this is"
+        sub="Kracked Devs bounty entry · Build for Better Connectivity — built by @nazlamp"
+        action={
+          <a href={whatItIsForUrl} target="_blank" rel="noreferrer">
+            <Button size="sm" variant="ghost">
+              <Expand /> Open full size
+            </Button>
+          </a>
         }
       >
-        <p className="text-sm leading-relaxed">
-          COSTERA reads a batch of scattered support tickets, works out what each one is about, then sends every ticket
-          to the <span className="font-medium">cheapest lane that can handle it</span>: a free knowledge-base lookup when
-          an answer already exists, a small classifier to sort and summarise, and a heavyweight model only when a group
-          of tickets really needs cross-ticket analysis. Anything the desk is unsure about, or that touches a customer's
-          money, stops at a human with its reasoning and evidence attached. What comes back is a set of recurring
-          patterns, a draft escalation brief, and an honest estimate of what the routing saved.
-        </p>
+        <a
+          href={whatItIsForUrl}
+          target="_blank"
+          rel="noreferrer"
+          title="Open full size in a new tab"
+          className="block w-full overflow-hidden rounded-lg border bg-white p-2 transition-shadow hover:shadow-md"
+        >
+          <img
+            src={whatItIsForUrl}
+            alt="Three panels. One, who it's for: telco customer-support agents juggling billing tickets and connectivity issues, piecing scattered complaints together and deciding what to escalate. Two, the problem: duplicate tickets read over and over, missed patterns with weak evidence, and overconfident AI or expensive models on every step. Three, what was built: ticket intake, recurring-pattern detection and tiered AI routing across low-cost, standard and flagship lanes — always the cheapest capable model, with anything below 70% confidence or money-related going to human review, then an escalation brief and next steps. Bottom strip: what agents get — evidence-backed patterns, a ready-to-send escalation brief, and an AI cost comparison against an all-flagship baseline."
+            className="mx-auto w-full max-w-3xl"
+            loading="lazy"
+            decoding="async"
+          />
+        </a>
         <div className="mt-4 flex flex-wrap gap-2">
           <Button size="sm" variant="outline" onClick={() => desk.setView("overview")}>
             <ArrowRight /> Open the desk
@@ -133,15 +145,18 @@ export function HowItWorks({ desk }: { desk: Desk }) {
         </div>
       </SectionCard>
 
-      <SectionCard title="Start here" sub="Reviewer path · about two minutes, your own key and quota">
+      <SectionCard title="Start here" sub="Reviewer path · about two minutes">
         <ol className="space-y-3">
           {[
             {
               n: "1",
               body: (
                 <>
-                  Open <span className="font-medium">Settings</span> and under “Bring your own API access” paste your
-                  provider key and OpenAI-compatible base URL (public HTTPS, ending in <code>/compatible-mode/v1</code>).
+                  Open <span className="font-medium">Settings</span>. No API key of your own? Press{" "}
+                  <span className="font-medium">Use temporary reviewer access</span> — owner-provided access, enabled
+                  for the review window only, with the key and endpoint kept server-side. Otherwise paste your provider
+                  key and OpenAI-compatible base URL (public HTTPS, ending in <code>/compatible-mode/v1</code>) under
+                  “Bring your own API access”.
                 </>
               ),
             },
