@@ -220,6 +220,30 @@
 html {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in oklab, var(--primary) 38%, transparent) transparent;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Touch ergonomics: comfortable targets, no focus-zoom jump on iOS, no tap flash. */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    min-height: 40px;
+    font-size: 16px;
+  }
+  button,
+  select,
+  input,
+  textarea,
+  a {
+    touch-action: manipulation;
+  }
+}
+
+button,
+a,
+[role="button"] {
+  -webkit-tap-highlight-color: transparent;
 }
 
 summary:focus-visible {
@@ -244,4 +268,6 @@ body {
   background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-sans);
+  overflow-x: clip;
+  padding-bottom: env(safe-area-inset-bottom);
 }

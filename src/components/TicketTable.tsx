@@ -77,8 +77,8 @@ export function TicketTable({
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="relative min-w-40 flex-1">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <label className="relative w-full sm:min-w-40 sm:flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <input
             value={q}
@@ -87,38 +87,85 @@ export function TicketTable({
               setPage(0);
             }}
             placeholder="Search tickets…"
-            className="w-full rounded-lg border bg-background py-1.5 pl-8 pr-2.5 text-xs outline-none transition-colors focus:border-teal-500 focus:ring-2 focus:ring-teal-500/25"
+            className="w-full rounded-lg border bg-background py-2 pl-8 pr-2.5 text-xs outline-none transition-colors focus:border-teal-500 focus:ring-2 focus:ring-teal-500/25 sm:py-1.5"
           />
         </label>
-        <select
-          value={lane}
-          onChange={(e) => {
-            setLane(e.target.value);
-            setPage(0);
-          }}
-          aria-label="Filter by lane"
-          className="rounded-lg border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-teal-500"
-        >
-          <option value="all">All lanes</option>
-          <option value="direct">Direct / code</option>
-          <option value="human_review">Human review</option>
-          <option value="tier2_candidate">Tier 2 candidate</option>
-          <option value="error">Error</option>
-          {!result && <option value="unrouted">Not routed yet</option>}
-        </select>
-        <select
-          value={sort}
-          onChange={(e) => setSort(e.target.value)}
-          aria-label="Sort tickets"
-          className="rounded-lg border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-teal-500"
-        >
-          <option value="priority">Sort: review priority</option>
-          <option value="id">Sort: ticket ID</option>
-          <option value="confidence">Sort: confidence ↑</option>
-        </select>
+        <div className="grid grid-cols-2 gap-2 sm:contents">
+          <select
+            value={lane}
+            onChange={(e) => {
+              setLane(e.target.value);
+              setPage(0);
+            }}
+            aria-label="Filter by lane"
+            className="w-full rounded-lg border bg-background px-2.5 py-2 text-xs outline-none focus:border-teal-500 sm:w-auto sm:py-1.5"
+          >
+            <option value="all">All lanes</option>
+            <option value="direct">Direct / code</option>
+            <option value="human_review">Human review</option>
+            <option value="tier2_candidate">Tier 2 candidate</option>
+            <option value="error">Error</option>
+            {!result && <option value="unrouted">Not routed yet</option>}
+          </select>
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+            aria-label="Sort tickets"
+            className="w-full rounded-lg border bg-background px-2.5 py-2 text-xs outline-none focus:border-teal-500 sm:w-auto sm:py-1.5"
+          >
+            <option value="priority">Sort: review priority</option>
+            <option value="id">Sort: ticket ID</option>
+            <option value="confidence">Sort: confidence ↑</option>
+          </select>
+        </div>
       </div>
 
-      <div className="scrollbar-thin mt-3 overflow-x-auto rounded-lg border">
+      <ul className="mt-3 space-y-2 sm:hidden">
+        {slice.map((r) => {
+          const active = r.ticket.id === selected;
+          return (
+            <li
+              key={r.ticket.id}
+              onClick={() => onSelect(r.ticket.id)}
+              className={`cursor-pointer rounded-lg border px-3 py-2.5 transition-colors ${
+                active
+                  ? "border-teal-500 bg-teal-50/80 shadow-[inset_3px_0_0_0_var(--primary)] dark:bg-teal-950/40"
+                  : "bg-card hover:bg-muted/40"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-mono text-xs font-semibold">{r.ticket.id}</p>
+                {r.tr ? <LaneBadge lane={r.tr.lane} /> : <span className="text-[11px] text-muted-foreground">Not routed</span>}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">{issueTitle(r.ticket.text)}</p>
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <span className="text-[11px] text-muted-foreground">{r.tr?.intent ?? "—"}</span>
+                <span className="w-28 shrink-0">
+                  <ConfidenceBar value={r.tr?.confidence ?? null} probabilities={r.tr?.probabilities} />
+                </span>
+                <button
+                  type="button"
+                  aria-label={`Open ${r.ticket.id}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpen(r.ticket.id);
+                  }}
+                  className="-my-1 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <ChevronRight className="size-4" />
+                </button>
+              </div>
+            </li>
+          );
+        })}
+        {slice.length === 0 && (
+          <li className="rounded-lg border border-dashed px-3 py-6 text-center text-xs text-muted-foreground">
+            No tickets match the current search or filter.
+          </li>
+        )}
+      </ul>
+
+      <div className="scrollbar-thin mt-3 hidden overflow-x-auto rounded-lg border sm:block">
         <table className="w-full min-w-130 text-sm">
           <thead>
             <tr className="border-b bg-muted/50 text-left text-xs text-muted-foreground">
@@ -189,7 +236,7 @@ export function TicketTable({
             aria-label="Previous page"
             disabled={safePage === 0}
             onClick={() => setPage(safePage - 1)}
-            className="rounded-md border p-1.5 transition-colors hover:bg-muted disabled:opacity-40"
+            className="rounded-md border p-2 transition-colors hover:bg-muted disabled:opacity-40 sm:p-1.5"
           >
             <ChevronLeft className="size-3.5" />
           </button>
@@ -198,7 +245,7 @@ export function TicketTable({
               key={i}
               type="button"
               onClick={() => setPage(i)}
-              className={`size-7 rounded-md border font-mono text-xs transition-colors ${
+              className={`size-8 rounded-md border font-mono text-xs transition-colors sm:size-7 ${
                 i === safePage ? "border-teal-600 bg-teal-600 text-white" : "hover:bg-muted"
               }`}
             >
@@ -210,7 +257,7 @@ export function TicketTable({
             aria-label="Next page"
             disabled={safePage >= pages - 1}
             onClick={() => setPage(safePage + 1)}
-            className="rounded-md border p-1.5 transition-colors hover:bg-muted disabled:opacity-40"
+            className="rounded-md border p-2 transition-colors hover:bg-muted disabled:opacity-40 sm:p-1.5"
           >
             <ChevronRight className="size-3.5" />
           </button>

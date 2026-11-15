@@ -54,14 +54,14 @@ function ModelCard({
 }) {
   const t = TONES[tone];
   return (
-    <div className={`rounded-xl border px-4 py-3 shadow-xs ${t.card}`}>
+    <div className={`rounded-xl border px-3.5 py-3 shadow-xs sm:px-4 ${t.card}`}>
       <p className={`flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide ${t.label}`}>
         <span className={`flex size-6 items-center justify-center rounded-md ${t.chip}`}>
           <Icon className="size-3.5" />
         </span>
         {tier}
       </p>
-      <p className="mt-1.5 font-mono text-sm">
+      <p className="mt-1.5 break-all font-mono text-sm">
         {model ? <ModelName>{model}</ModelName> : <span className="text-muted-foreground">no model call</span>}
       </p>
       <p className="mt-1 text-xs text-muted-foreground">{role}</p>
@@ -198,7 +198,7 @@ export function ModelCost({ stats, models }: { stats: TriageStats | null; models
                 </div>
               </div>
             </div>
-            <div className="sm:text-right">
+            <div className="flex items-baseline justify-between gap-3 sm:block sm:text-right">
               <p className="text-xs text-muted-foreground">Saved by routing</p>
               <p className="bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text font-mono text-2xl font-semibold text-transparent dark:from-emerald-400 dark:to-teal-300">
                 {cost.savingsPct !== null ? `${cost.savingsPct.toFixed(0)}%` : "—"}

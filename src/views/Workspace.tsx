@@ -104,7 +104,7 @@ export function HumanView({ desk }: { desk: Desk }) {
                   {tr?.unsure && (
                     <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">Tier 1 unsure</Badge>
                   )}
-                  <span className="ml-auto text-xs text-muted-foreground">{h.reasons.join("; ")}</span>
+                  <span className="w-full text-xs text-muted-foreground sm:ml-auto sm:w-auto">{h.reasons.join("; ")}</span>
                 </div>
                 {h.summary && (
                   <p className="mt-1.5 text-xs italic text-muted-foreground">
@@ -171,7 +171,7 @@ export function PatternsView({ desk }: { desk: Desk }) {
                   <Badge variant="secondary">{p.count} tickets</Badge>
                   <Badge variant="outline">{p.distinctCustomers} customers</Badge>
                   <Badge variant="outline">min conf {Math.round(p.confidenceMin * 100)}%</Badge>
-                  <span className="ml-auto text-xs text-muted-foreground">
+                  <span className="w-full text-xs text-muted-foreground sm:ml-auto sm:w-auto">
                     avg confidence {Math.round(p.confidenceAvg * 100)}% · intent {p.intent}
                   </span>
                 </div>
@@ -232,7 +232,7 @@ export function FindingsView({ desk }: { desk: Desk }) {
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="text-sm font-semibold">{a.title}</h3>
                   <Badge variant="outline">{a.count} tickets</Badge>
-                  <span className="ml-auto text-xs text-muted-foreground">
+                  <span className="w-full text-xs text-muted-foreground sm:ml-auto sm:w-auto">
                     Model-generated (<ModelName>{a.model}</ModelName>) — verify before acting
                   </span>
                 </div>
@@ -287,7 +287,7 @@ export function BriefView({ desk }: { desk: Desk }) {
         </Button>
       }
     >
-      <pre className="scrollbar-thin max-h-[52vh] overflow-y-auto whitespace-pre-wrap rounded-lg border bg-muted/60 p-4 font-mono text-xs leading-relaxed">
+      <pre className="scrollbar-thin max-h-[52vh] overflow-y-auto whitespace-pre-wrap break-words rounded-lg border bg-muted/60 p-3 font-mono text-xs leading-relaxed sm:p-4">
         {desk.result.brief}
       </pre>
       {desk.extras.length > 0 && (
@@ -338,7 +338,40 @@ export function CostView({ desk }: { desk: Desk }) {
         {desk.runs.length === 0 ? (
           <InfoNote>No runs yet in this session. Run triage to record cost figures.</InfoNote>
         ) : (
-          <div className="scrollbar-thin overflow-x-auto rounded-lg border">
+          <>
+          <ul className="space-y-2 sm:hidden">
+            {desk.runs.map((r) => {
+              const c = computeCost(r.stats, ratesForModels(r.models));
+              return (
+                <li key={r.id} className="rounded-lg border bg-card px-3 py-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-mono text-xs font-semibold">{r.id.slice(0, 8)}</p>
+                    <p className="text-[11px] text-muted-foreground">{new Date(r.at).toLocaleTimeString()}</p>
+                  </div>
+                  <p className="mt-1 break-all font-mono text-[10px] text-muted-foreground">
+                    {r.models.decision} / {r.models.flash} / {r.models.max}
+                  </p>
+                  <dl className="mt-2 grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-md bg-muted/60 px-1 py-1.5">
+                      <dt className="text-[10px] text-muted-foreground">Routed</dt>
+                      <dd className="font-mono text-xs font-semibold">{usd(c.routed)}</dd>
+                    </div>
+                    <div className="rounded-md bg-muted/60 px-1 py-1.5">
+                      <dt className="text-[10px] text-muted-foreground">Baseline</dt>
+                      <dd className="font-mono text-xs font-semibold">{usd(c.baseline)}</dd>
+                    </div>
+                    <div className="rounded-md bg-teal-50 px-1 py-1.5 dark:bg-teal-950/50">
+                      <dt className="text-[10px] text-muted-foreground">Saved</dt>
+                      <dd className="font-mono text-xs font-semibold text-teal-700 dark:text-teal-300">
+                        {c.savingsPct != null ? `${c.savingsPct.toFixed(0)}%` : "—"}
+                      </dd>
+                    </div>
+                  </dl>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="scrollbar-thin hidden overflow-x-auto rounded-lg border sm:block">
             <table className="w-full min-w-160 text-sm">
               <thead>
                 <tr className="border-b bg-muted/50 text-left text-xs text-muted-foreground">
@@ -371,6 +404,7 @@ export function CostView({ desk }: { desk: Desk }) {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </SectionCard>
     </div>
@@ -403,17 +437,17 @@ export function HistoryView({ desk }: { desk: Desk }) {
           {desk.runs.map((r) => {
             const c = computeCost(r.stats, ratesForModels(r.models));
             return (
-              <li key={r.id} className="flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3">
+              <li key={r.id} className="flex flex-wrap items-center gap-3 rounded-lg border px-3 py-3 sm:px-4">
                 <span className="flex size-9 items-center justify-center rounded-lg bg-teal-100 text-teal-700 dark:bg-teal-900/60 dark:text-teal-300">
                   <History className="size-4" />
                 </span>
-                <div className="min-w-40 flex-1">
+                <div className="min-w-0 flex-1">
                   <p className="font-mono text-xs font-semibold">{r.id.slice(0, 8)}</p>
                   <p className="text-xs text-muted-foreground">
                     {new Date(r.at).toLocaleString()} · {r.stats.tickets} tickets · {r.stats.tier1Calls} Tier 1 ·{" "}
                     {r.stats.tier2.light.calls} flash · {r.stats.tier2.heavy.calls} Max
                   </p>
-                  <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
+                  <p className="mt-0.5 break-all font-mono text-[10px] text-muted-foreground">
                     {r.models.decision} → {r.models.flash} / {r.models.max}
                     {r.decisionEngine === "chat" ? " · chat classifier" : ""}
                   </p>
@@ -455,7 +489,7 @@ export function SettingsView({ desk }: { desk: Desk }) {
   return (
     <div className="space-y-5">
       <ByoAccess desk={desk} />
-      <div className="grid items-start gap-5 lg:grid-cols-2">
+      <div className="grid items-start gap-5 sm:grid-cols-2">
       <SectionCard title="Appearance" sub="Theme preference is stored in this browser">
         <div className="flex gap-2">
           {themes.map((t) => (
@@ -798,7 +832,7 @@ function ByoAccess({ desk }: { desk: Desk }) {
           never changes the Tier 2 selections, so you can price an all-flagship run against a tiered run in Cost
           analytics.
         </InfoNote>
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2">
           <label className="block">
             <span className="text-xs font-medium text-muted-foreground">Shared base URL (all tiers)</span>
             <input
@@ -912,7 +946,7 @@ function ByoAccess({ desk }: { desk: Desk }) {
                     />
                   )}
                 </div>
-                <div className="mt-2 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
                   <SecretInput
                     value={desk.creds.tiers[t.id].key}
                     onChange={(v) => setTier(t.id, { key: v })}

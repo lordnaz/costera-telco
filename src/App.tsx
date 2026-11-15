@@ -9,6 +9,7 @@ import {
   History,
   Home,
   Inbox,
+  KeyRound,
   Layers,
   LineChart,
   Loader2,
@@ -274,9 +275,11 @@ export default function App() {
       className={`flex items-center gap-2.5 rounded-lg text-sm transition-colors ${
         compact ? "shrink-0 px-3 py-1.5 text-xs" : "w-full px-3 py-2"
       } ${
-        view === n.view
-          ? "bg-teal-50 font-semibold text-teal-700 dark:bg-teal-950/60 dark:text-teal-300"
-          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+        n.view === "how"
+          ? "bg-gradient-to-r from-teal-600 to-emerald-600 font-semibold text-white shadow-sm shadow-teal-600/25 hover:from-teal-500 hover:to-emerald-500 hover:text-white"
+          : view === n.view
+            ? "bg-teal-50 font-semibold text-teal-700 dark:bg-teal-950/60 dark:text-teal-300"
+            : "text-muted-foreground hover:bg-muted hover:text-foreground"
       }`}
     >
       <n.icon className="size-4 shrink-0" />
@@ -341,7 +344,7 @@ export default function App() {
 
       <div className="min-w-0 flex-1">
         <header className="sticky top-0 z-30 border-b bg-background/85 backdrop-blur-md">
-          <div className="flex flex-wrap items-center gap-3 px-5 py-3">
+          <div className="flex flex-wrap items-center gap-3 px-3 py-2.5 sm:px-5 sm:py-3">
             <span className="flex items-center gap-2 lg:hidden">
               <span className="flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-teal-500 to-emerald-600 text-white">
                 <Layers className="size-3.5" />
@@ -361,11 +364,16 @@ export default function App() {
                   <span className="size-1.5 rounded-full bg-teal-500" /> Session API key
                 </Badge>
               ) : (
-                <Badge variant="secondary" title="This build has no server-side key — open Settings to add your own API access">
-                  Add access in Settings
+                <Badge
+                  className="bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200"
+                  title="This build has no server-side key — open Settings to add your own API access"
+                >
+                  <KeyRound /> Add access in Settings
                 </Badge>
               )}
-              <Badge variant="outline">Synthetic data</Badge>
+              <Badge variant="outline" title="Synthetic tickets, customers, plans and outages only">
+                <ShieldAlert /> Synthetic data
+              </Badge>
             </div>
           </div>
           <nav className="scrollbar-thin flex gap-1 overflow-x-auto px-4 pb-2 lg:hidden" aria-label="Workspace sections">
@@ -374,15 +382,15 @@ export default function App() {
           </nav>
         </header>
 
-        <main className="space-y-5 px-5 py-5">
-          <div className="flex flex-wrap items-end justify-between gap-3">
+        <main className="space-y-4 px-3 py-4 sm:space-y-5 sm:px-5 sm:py-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">{TITLES[view][0]}</h1>
+              <h1 className="text-xl font-bold tracking-tight sm:text-2xl">{TITLES[view][0]}</h1>
               <p className="mt-1 text-sm text-muted-foreground">{TITLES[view][1]}</p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex w-full gap-2 sm:w-auto sm:flex-wrap">
               {(view === "overview" || view === "tickets" || view === "history") && (
-                <Button variant="outline" size="sm" disabled={!result} onClick={() => openLog()} title={result ? "Per-ticket request/response trace of the latest run" : "Run triage first"}>
+                <Button variant="outline" size="sm" className="flex-1 sm:flex-none" disabled={!result} onClick={() => openLog()} title={result ? "Per-ticket request/response trace of the latest run" : "Run triage first"}>
                   <FileText /> View run log
                 </Button>
               )}
@@ -393,8 +401,8 @@ export default function App() {
                   size="sm"
                   className={
                     result
-                      ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-600/25 hover:from-emerald-500 hover:to-teal-500 disabled:shadow-none"
-                      : "bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-md shadow-teal-600/25 hover:from-teal-500 hover:to-emerald-500 disabled:shadow-none"
+                      ? "flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-600/25 hover:from-emerald-500 hover:to-teal-500 disabled:shadow-none sm:flex-none"
+                      : "flex-1 bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-md shadow-teal-600/25 hover:from-teal-500 hover:to-emerald-500 disabled:shadow-none sm:flex-none"
                   }
                   title={
                     result
@@ -505,7 +513,7 @@ export default function App() {
             className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] dark:bg-black/60"
             onClick={() => setPreflightOpen(false)}
           />
-          <div className="rise relative w-full max-w-md rounded-xl border bg-card p-5 shadow-2xl">
+          <div className="rise scrollbar-thin relative max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-xl border bg-card p-4 shadow-2xl sm:p-5">
             <h2 id="preflight-title" className="flex items-center gap-2 text-base font-semibold tracking-tight">
               <ShieldAlert className="size-4 text-amber-600" /> Finish the 3-tier AI setup first
             </h2>
@@ -544,19 +552,32 @@ export default function App() {
                 );
               })}
             </ul>
-            <div className="mt-4 flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => setPreflightOpen(false)}>
-                Not now
-              </Button>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
               <Button
+                variant="ghost"
                 size="sm"
+                className="justify-start sm:mr-auto"
                 onClick={() => {
                   setPreflightOpen(false);
-                  setView("settings");
+                  setView("how");
                 }}
               >
-                Open Settings
+                <BookOpen /> How it works
               </Button>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => setPreflightOpen(false)}>
+                  Not now
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setPreflightOpen(false);
+                    setView("settings");
+                  }}
+                >
+                  Open Settings
+                </Button>
+              </div>
             </div>
           </div>
         </div>

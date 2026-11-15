@@ -96,7 +96,7 @@ export function Overview({ desk }: { desk: Desk }) {
         )}
       </section>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Kpi
           icon={ClipboardList}
           tone="blue"
@@ -144,7 +144,7 @@ export function Overview({ desk }: { desk: Desk }) {
         <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-3 py-1 text-xs font-medium text-violet-700 dark:bg-violet-950/60 dark:text-violet-300">
           <span className="size-1.5 rounded-full bg-violet-500" /> {lanes.tier2_candidate ?? 0} Tier 2 candidates
         </span>
-        <span className="ml-auto flex items-center gap-2 border-l pl-4 text-xs text-muted-foreground">
+        <span className="flex w-full items-center gap-2 border-t pt-2 text-xs text-muted-foreground sm:ml-auto sm:w-auto sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
           <Clock className="size-4" />
           <span>
             Avg. latency{" "}
@@ -155,13 +155,13 @@ export function Overview({ desk }: { desk: Desk }) {
         </span>
       </div>
 
-      <nav className="flex flex-wrap gap-1 border-b" aria-label="Overview sections">
+      <nav className="scrollbar-thin flex gap-1 overflow-x-auto border-b" aria-label="Overview sections">
         {TABS.map((t) => (
           <button
             key={t.view}
             type="button"
             onClick={() => desk.setView(t.view)}
-            className={`-mb-px border-b-2 px-3.5 py-2 text-sm transition-colors ${
+            className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-3.5 py-2 text-sm transition-colors ${
               t.view === "overview"
                 ? "border-teal-600 font-semibold text-teal-700 dark:text-teal-300"
                 : "border-transparent text-muted-foreground hover:text-foreground"

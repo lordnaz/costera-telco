@@ -140,15 +140,15 @@ export function Kpi({
 }) {
   const [card, chip] = KPI_TONES[tone];
   return (
-    <div className={`rise rounded-xl border px-4 py-3.5 shadow-xs ${card}`} style={{ animationDelay: `${delay}ms` }}>
-      <div className="flex items-center gap-2.5">
-        <span className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${chip}`}>
-          <Icon className="size-4" />
+    <div className={`rise rounded-xl border px-3 py-3 shadow-xs sm:px-4 sm:py-3.5 ${card}`} style={{ animationDelay: `${delay}ms` }}>
+      <div className="flex items-center gap-2 sm:gap-2.5">
+        <span className={`flex size-7 shrink-0 items-center justify-center rounded-lg sm:size-8 ${chip}`}>
+          <Icon className="size-3.5 sm:size-4" />
         </span>
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
+        <p className="text-[11px] font-medium text-muted-foreground sm:text-xs">{label}</p>
       </div>
-      <p className="mt-2 font-mono text-2xl font-semibold tracking-tight">{value}</p>
-      <p className="mt-0.5 text-[11px] text-muted-foreground">{sub}</p>
+      <p className="mt-1.5 font-mono text-xl font-semibold tracking-tight sm:mt-2 sm:text-2xl">{value}</p>
+      <p className="mt-0.5 text-[10px] text-muted-foreground sm:text-[11px]">{sub}</p>
     </div>
   );
 }
@@ -170,14 +170,14 @@ export function SectionCard({
 }) {
   return (
     <section className={`rise rounded-xl border bg-card shadow-xs ${className}`} style={{ animationDelay: `${delay}ms` }}>
-      <header className="flex flex-wrap items-start justify-between gap-2 px-5 pb-3 pt-4">
-        <div>
+      <header className="flex flex-wrap items-start justify-between gap-2 px-4 pb-3 pt-4 sm:px-5">
+        <div className="min-w-0">
           <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight">{title}</h2>
           {sub && <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>}
         </div>
         {action}
       </header>
-      <div className="px-5 pb-5">{children}</div>
+      <div className="px-4 pb-4 sm:px-5 sm:pb-5">{children}</div>
     </section>
   );
 }
@@ -261,8 +261,8 @@ export function Drawer({
       <aside
         className={`rise absolute right-0 top-0 flex h-full w-full flex-col border-l bg-card shadow-2xl ${wide ? "max-w-2xl" : "max-w-xl"}`}
       >
-        <header className="flex items-start justify-between gap-3 border-b px-5 py-4">
-          <div>
+        <header className="flex items-start justify-between gap-3 border-b px-4 py-3.5 sm:px-5 sm:py-4">
+          <div className="min-w-0">
             <h2 className="text-base font-semibold tracking-tight">{title}</h2>
             {sub && <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>}
           </div>
@@ -270,12 +270,12 @@ export function Drawer({
             type="button"
             onClick={onClose}
             aria-label="Close panel"
-            className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="-mr-1 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:p-1.5"
           >
             <X className="size-4" />
           </button>
         </header>
-        <div className="scrollbar-thin flex-1 overflow-y-auto px-5 py-4">{children}</div>
+        <div className="scrollbar-thin flex-1 overflow-y-auto overscroll-contain px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-5">{children}</div>
       </aside>
     </div>
   );
