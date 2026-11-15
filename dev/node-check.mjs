@@ -202,6 +202,7 @@ async function call(handler, path, method = "GET", body) {
     sessionActive,
     assertPublicHttpsUrl,
     CredentialsError,
+    ReviewerAccessError,
   } = await import("../server/credentials.ts");
   const h = createHandler(() => undefined);
   const post = (path, body) =>
@@ -225,8 +226,16 @@ async function call(handler, path, method = "GET", body) {
   assert.equal(eff.tiers.decision.key, "d");
   assert.equal(eff.tiers.flash.key, "shared");
   assert.equal(eff.tiers.max.baseUrl, "https://example.com/v1");
-  const effEnv = effectiveCredentials(null, (n) => (n === "COSTERA_API_KEY" ? "owner" : "https://owner.example/v1"));
-  assert.equal(effEnv.tiers.decision.key, "owner");
+  const envReader = (n) =>
+    n === "COSTERA_API_KEY" ? "owner" : n === "COSTERA_API_BASE_URL" ? "https://owner.example/v1" : undefined;
+  const effNoDemo = effectiveCredentials(null, envReader);
+  assert.equal(effNoDemo.tiers.decision.key, "");
+  const effDemo = effectiveCredentials(null, envReader, true);
+  assert.equal(effDemo.tiers.decision.key, "owner");
+  assert.equal(effDemo.tiers.max.baseUrl, "https://owner.example/v1");
+  const effDemoSession = effectiveCredentials(s, envReader, true);
+  assert.equal(effDemoSession.tiers.decision.key, "owner");
+  assert.throws(() => effectiveCredentials(null, () => undefined, true), ReviewerAccessError);
   assert.throws(() => assertPublicHttpsUrl("https://10.0.0.5/v1"), CredentialsError);
   assert.throws(() => assertPublicHttpsUrl("https://localhost/v1"), CredentialsError);
   assert.throws(() => assertPublicHttpsUrl("https://example.com:8443/v1"), CredentialsError);
@@ -337,6 +346,56 @@ async function call(handler, path, method = "GET", body) {
   assert.equal(r.flashIn, 1.6); // flagship priced on the light lane
   assert.equal(r.maxIn, 0.1); // light priced on the heavy lane
   console.log("PASS model catalogue (classifier-only off chat lists, both Tier 2 lanes list light + flagship)");
+}
+
+// 15. Temporary reviewer access: explicit opt-in only, no silent env fallback, no secret leakage
+{
+  const { createHandler } = await import("../server/handler.ts");
+  const { fixtureClassify } = await import("./fixtures.ts");
+  const { fixtureAnalyze, fixtureSummarize } = await import("./fixtures-tier2.ts");
+  const env = (n) =>
+    n === "COSTERA_API_KEY" ? "owner-secret-key" : n === "COSTERA_API_BASE_URL" ? "https://owner.example/v1" : undefined;
+  const h = createHandler(env, {
+    classify: fixtureClassify,
+    tier2: { summarize: fixtureSummarize, analyze: fixtureAnalyze },
+  });
+  const post = (path, body) =>
+    h(new Request(`http://local/api/${path}`, { method: "POST", body: JSON.stringify(body) }));
+  // env configured, but no opt-in and no session key → still refused (no silent fallback)
+  const hLive = createHandler(env);
+  let r = await hLive(new Request("http://local/api/triage", { method: "POST", body: JSON.stringify({}) }));
+  assert.equal(r.status, 503);
+  assert.equal((await r.json()).error, "service_not_configured");
+  // explicit opt-in runs on the env key and reports it honestly
+  r = await post("triage", {
+    demoAccess: true,
+    credentials: {
+      tiers: {
+        decision: { model: "decision-model-preview" },
+        flash: { model: "qwen3.8-flash" },
+        max: { model: "qwen3.8-max" },
+      },
+    },
+  });
+  assert.equal(r.status, 200);
+  const j = await r.json();
+  assert.equal(j.keySource, "env");
+  assert.equal(j.models.decision, "decision-model-preview");
+  // availability endpoint exposes model names only — never the key or hostname
+  r = await h(new Request("http://local/api/demo-access"));
+  const info = await r.json();
+  assert.equal(info.available, true);
+  assert.ok(info.models && info.models.flash.length > 0);
+  const raw = JSON.stringify(info);
+  assert.ok(!raw.includes("owner-secret-key") && !raw.includes("owner.example"));
+  // without env, opt-in is refused on both triage and the connection test
+  const hEmpty = createHandler(() => undefined, { classify: fixtureClassify });
+  r = await hEmpty(new Request("http://local/api/credentials", { method: "POST", body: JSON.stringify({ tier: "decision", demo: true }) }));
+  assert.equal((await r.json()).error, "reviewer_access_unavailable");
+  r = await hEmpty(new Request("http://local/api/triage", { method: "POST", body: JSON.stringify({ demoAccess: true }) }));
+  assert.equal(r.status, 503);
+  assert.equal((await r.json()).error, "reviewer_access_unavailable");
+  console.log("PASS temporary reviewer access (opt-in only, no silent fallback, no secret leakage)");
 }
 
 console.log("ALL CHECKS PASSED");

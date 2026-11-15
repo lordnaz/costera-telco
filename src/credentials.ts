@@ -43,6 +43,13 @@ export const effective = (c: SessionCreds, t: TierId): TierEntry => ({
 // Empty means "no selection" — the reviewer must choose a model explicitly.
 export const effectiveModel = (c: SessionCreds, t: TierId): string => effective(c, t).model;
 
+// What the Settings page currently holds per lane, for readouts before any run exists.
+export const sessionModels = (c: SessionCreds) => ({
+  decision: effectiveModel(c, "decision"),
+  flash: effectiveModel(c, "flash"),
+  max: effectiveModel(c, "max"),
+});
+
 export const sessionActive = (c: SessionCreds): boolean =>
   c.key.trim().length > 0 || TIERS.some((t) => c.tiers[t.id].key.trim().length > 0);
 
@@ -72,3 +79,29 @@ export const credentialsPayload = (c: SessionCreds) => {
     tiers: { decision: tier("decision"), flash: tier("flash"), max: tier("max") },
   };
 };
+
+// Temporary reviewer opt-in: the server resolves key+endpoint from its own environment.
+// The browser sends model choices only — never a key, never a URL.
+export interface DemoAccessInfo {
+  ok: boolean;
+  available: boolean;
+  models: { decision: string; flash: string; max: string } | null;
+  decisionEngine: "systemone" | "chat";
+}
+
+export const demoCredentialsPayload = (
+  models: { decision: string; flash: string; max: string },
+  engine: "systemone" | "chat",
+) => ({
+  demoAccess: true,
+  credentials: {
+    baseUrl: "",
+    key: "",
+    decisionEngine: engine,
+    tiers: {
+      decision: { key: "", baseUrl: "", model: models.decision },
+      flash: { key: "", baseUrl: "", model: models.flash },
+      max: { key: "", baseUrl: "", model: models.max },
+    },
+  },
+});

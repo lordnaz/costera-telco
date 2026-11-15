@@ -300,7 +300,7 @@ export function TicketDetail({
     (tr?.lane === "human_review"
       ? "Verify the account and billing period with the customer before responding."
       : tr?.lane === "tier2_candidate"
-        ? "Escalated: flash summary prepared; Max cluster analysis runs only if the cluster warrants it."
+        ? "Escalated: a light-lane summary is prepared; heavy-lane cluster analysis runs only if the cluster warrants it."
         : tr?.lane === "direct"
           ? "Answer from the deterministic knowledge-base hit below; no generation call needed."
           : "Run triage to classify and route this ticket.");
@@ -312,7 +312,7 @@ export function TicketDetail({
           <span className="flex flex-wrap items-center gap-1.5">
             {analysis && (
               <span className="inline-flex rounded-full bg-fuchsia-50 px-2.5 py-0.5 text-[11px] font-medium text-fuchsia-700 dark:bg-fuchsia-950/60 dark:text-fuchsia-300">
-                Max analysed
+                Cluster analysed
               </span>
             )}
             {tr ? <LaneBadge lane={tr.lane} /> : <span className="text-xs text-muted-foreground">Not routed yet</span>}
@@ -358,7 +358,8 @@ export function TicketDetail({
         </p>
         {tr?.summary && (
           <p className="mt-1.5 text-xs italic text-muted-foreground">
-            Summary (<ModelName>qwen3.8-flash</ModelName>): {tr.summary}
+            Summary ({result?.models?.flash ? <ModelName>{result.models.flash}</ModelName> : "light lane"}):{" "}
+            {tr.summary}
           </p>
         )}
       </div>

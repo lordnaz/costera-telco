@@ -1,6 +1,6 @@
 import { useEffect, type ComponentType, type ReactNode } from "react";
 import { AlertTriangle, Info, X } from "lucide-react";
-import type { SessionCreds } from "../credentials";
+import type { DemoAccessInfo, SessionCreds } from "../credentials";
 import type { Batch, Health, TicketResult, TraceEntry, TriageResult } from "../types";
 
 export type View =
@@ -54,6 +54,14 @@ export interface Desk {
   setCreds: (c: SessionCreds) => void;
   tierStatus: Record<TierId, TestState>;
   setTierStatus: (t: TierId, s: TestState) => void;
+  demoInfo: DemoAccessInfo | null;
+  demoMode: boolean;
+  demoModels: { decision: string; flash: string; max: string };
+  setDemoModels: (m: { decision: string; flash: string; max: string }) => void;
+  demoEngine: "systemone" | "chat";
+  setDemoEngine: (e: "systemone" | "chat") => void;
+  requestDemo: () => void;
+  exitDemo: () => void;
   copyBrief: () => void;
   copied: boolean;
 }
@@ -69,7 +77,7 @@ export function LaneBadge({ lane }: { lane: TicketResult["lane"] }) {
   const map = {
     direct: ["bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300", "Direct / code", "Deterministic knowledge-base lookup — no generation call"],
     human_review: ["bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300", "Human review", "Handed to a human — never auto-resolved"],
-    tier2_candidate: ["bg-violet-50 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300", "Tier 2 candidate", "Escalated to Tier 2: flash summary, and Max analysis if the cluster warrants it"],
+    tier2_candidate: ["bg-violet-50 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300", "Tier 2 candidate", "Escalated to Tier 2: a light-lane summary, and heavy-lane analysis if the cluster warrants it"],
     error: ["bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300", "Error", "Classification failed for this ticket — see run log"],
   } as const;
   const [cls, label, tip] = map[lane];
@@ -102,7 +110,7 @@ export function ConfidenceBar({
   const tone = value < 0.7 ? "bg-amber-500" : "bg-teal-500";
   const tip =
     probabilities && Object.keys(probabilities).length > 0
-      ? `decision-model-preview · ${Object.entries(probabilities)
+      ? `Tier 1 classifier · ${Object.entries(probabilities)
           .map(([k, v]) => `${k} ${Math.round(v * 100)}%`)
           .join(" · ")}`
       : "Tier 1 classifier confidence";

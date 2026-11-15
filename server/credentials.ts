@@ -3,9 +3,9 @@
 // They are never stored, never logged, never echoed back, and never fall back to the
 // owner's environment key once a session key is present (public deployments stay off
 // the owner's bill). Session endpoints must be public HTTPS URLs (SSRF guard).
-// NOTE: the environment fallback below is kept only for reuse — no entry point of this app
-// supplies secrets any more (dev/* servers and functions/api pass an empty reader), so
-// Settings session keys are the only way to reach real models.
+// The owner's environment key is reachable ONLY through the explicit, temporary
+// reviewer opt-in (demoAccess flag + consent in the UI); it is retired after the
+// bounty review. Without that flag the environment is never consulted.
 
 import type { EnvReader } from "./decision.ts";
 
@@ -27,6 +27,13 @@ export interface SessionCredentials {
 
 export class CredentialsError extends Error {
   code = "invalid_credentials";
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+export class ReviewerAccessError extends Error {
+  code = "reviewer_access_unavailable";
   constructor(message: string) {
     super(message);
   }
@@ -105,31 +112,45 @@ export function sessionActive(s: SessionCredentials | null): boolean {
   return s.key.length > 0 || TIER_IDS.some((t) => s.tiers[t].key.length > 0);
 }
 
-// Session values win per tier (override, then shared). Once any session key exists the
-// owner's environment key is NOT used as a fallback for any tier.
+// Session values win per tier (override, then shared). Without the explicit demo opt-in
+// the owner's environment key is NEVER used, even when no session key is present.
+// With demoAccess=true the environment supplies key+endpoint for every tier (the browser
+// never sees them); session-supplied secrets are ignored so they cannot overwrite the env.
 export function effectiveCredentials(
   s: SessionCredentials | null,
   env: EnvReader,
+  demoAccess = false,
 ): { tiers: Record<TierId, TierCredentials>; decisionEngine: "systemone" | "chat" } {
-  const active = sessionActive(s);
   const tiers = {} as Record<TierId, TierCredentials>;
-  for (const t of TIER_IDS) {
-    if (active && s) {
+  if (demoAccess) {
+    const key = env("COSTERA_API_KEY") ?? "";
+    const baseUrl = env("COSTERA_API_BASE_URL") ?? "";
+    if (!key || !baseUrl) {
+      throw new ReviewerAccessError("Temporary reviewer access is not enabled on this deployment.");
+    }
+    assertPublicHttpsUrl(baseUrl);
+    for (const t of TIER_IDS) {
       tiers[t] = {
-        key: s.tiers[t].key || s.key,
-        baseUrl: s.tiers[t].baseUrl || s.baseUrl,
-        model: s.tiers[t].model,
-      };
-    } else {
-      tiers[t] = {
-        key: env("COSTERA_API_KEY") ?? "",
-        baseUrl: env("COSTERA_API_BASE_URL") ?? "",
-        model: env(`COSTERA_MODEL_${t.toUpperCase()}`) ?? "",
+        key,
+        baseUrl,
+        model: s?.tiers[t].model || env(`COSTERA_MODEL_${t.toUpperCase()}`) || "",
       };
     }
+    const engine = s?.decisionEngine ?? (env("COSTERA_DECISION_ENGINE") === "chat" ? "chat" : "systemone");
+    return { tiers, decisionEngine: engine };
   }
-  const decisionEngine =
-    active && s ? s.decisionEngine : env("COSTERA_DECISION_ENGINE") === "chat" ? "chat" : "systemone";
+  const active = sessionActive(s);
+  for (const t of TIER_IDS) {
+    tiers[t] =
+      active && s
+        ? {
+            key: s.tiers[t].key || s.key,
+            baseUrl: s.tiers[t].baseUrl || s.baseUrl,
+            model: s.tiers[t].model,
+          }
+        : { key: "", baseUrl: "", model: "" };
+  }
+  const decisionEngine = active && s ? s.decisionEngine : "systemone";
   return { tiers, decisionEngine };
 }
 

@@ -9,6 +9,7 @@
 import { BATCH_LABEL, TELCO, TICKETS } from "./data.ts";
 import {
   CredentialsError,
+  ReviewerAccessError,
   effectiveCredentials,
   parseSessionCredentials,
   sessionActive,
@@ -73,10 +74,29 @@ export function createHandler(env: EnvReader, opts: HandlerOpts = {}) {
       });
     }
 
+    if (route === "demo-access") {
+      if (request.method !== "GET") return json({ ok: false, error: "method_not_allowed" }, 405);
+      // Availability + model names only. The key and endpoint hostname never leave the server.
+      const available = configured();
+      return json({
+        ok: true,
+        available,
+        models: available
+          ? {
+              decision: env("COSTERA_MODEL_DECISION") || DECISION_MODEL,
+              flash: env("COSTERA_MODEL_FLASH") || FLASH_MODEL,
+              max: env("COSTERA_MODEL_MAX") || MAX_MODEL,
+            }
+          : null,
+        decisionEngine: env("COSTERA_DECISION_ENGINE") === "chat" ? "chat" : "systemone",
+      });
+    }
+
     if (route === "triage") {
       if (request.method !== "POST") return json({ ok: false, error: "method_not_allowed" }, 405);
       let ticketIds: string[] | undefined;
       let includeTrace = false;
+      let demoAccess = false;
       let session: SessionCredentials | null = null;
       let raw: string;
       try {
@@ -95,6 +115,7 @@ export function createHandler(env: EnvReader, opts: HandlerOpts = {}) {
         if (typeof body === "object" && body !== null) {
           const obj = body as Record<string, unknown>;
           includeTrace = obj.includeTrace === true;
+          demoAccess = obj.demoAccess === true;
           try {
             session = parseSessionCredentials(obj.credentials);
           } catch (e) {
@@ -118,18 +139,37 @@ export function createHandler(env: EnvReader, opts: HandlerOpts = {}) {
         }
       }
       const byo = sessionActive(session);
-      if (!fixtureClassify && !configured() && !byo) {
+      if (!fixtureClassify && !byo && !demoAccess) {
         return json(
           {
             ok: false,
             error: "service_not_configured",
             message:
-              "No API access configured. Supply your own session API key, endpoint and model per tier in Settings (memory-only, cleared on refresh), then press Test on each tier.",
+              "No API access configured. Supply your own session API key, endpoint and model per tier in Settings (memory-only, cleared on refresh), then press Test on each tier — or enable the temporary reviewer access offered there.",
           },
           503,
         );
       }
-      const eff = effectiveCredentials(session, env);
+      if (!fixtureClassify && demoAccess && !configured()) {
+        return json(
+          {
+            ok: false,
+            error: "reviewer_access_unavailable",
+            message: "Temporary reviewer access is not enabled on this deployment. Add your own API access in Settings.",
+          },
+          503,
+        );
+      }
+      let eff: ReturnType<typeof effectiveCredentials>;
+      try {
+        eff = effectiveCredentials(session, env, demoAccess);
+      } catch (e) {
+        if (e instanceof ReviewerAccessError) return json({ ok: false, error: e.code, message: e.message }, 503);
+        return json(
+          { ok: false, error: "invalid_credentials", message: e instanceof CredentialsError ? e.message : "Invalid credentials." },
+          400,
+        );
+      }
       const reader = (t: TierId) => tierEnvReader(eff.tiers[t], eff.decisionEngine, env);
       const classify = fixtureClassify ?? createDecisionClassifier(reader("decision"));
       const tier2: Tier2Deps =
@@ -179,16 +219,30 @@ export function createHandler(env: EnvReader, opts: HandlerOpts = {}) {
       if (typeof body !== "object" || body === null) return json({ ok: false, error: "invalid_body" }, 400);
       const obj = body as Record<string, unknown>;
       const tier = obj.tier;
-      const key = obj.key;
-      const baseUrl = obj.baseUrl;
-      if (
-        (tier !== "decision" && tier !== "flash" && tier !== "max") ||
-        typeof key !== "string" ||
-        key.trim().length === 0 ||
-        key.length > 512 ||
-        typeof baseUrl !== "string"
-      ) {
+      if (tier !== "decision" && tier !== "flash" && tier !== "max") {
         return json({ ok: false, error: "invalid_credentials", message: "Provide tier, key and baseUrl." }, 400);
+      }
+      let key: string;
+      let baseUrl: string;
+      if (obj.demo === true) {
+        // Temporary reviewer opt-in: test the server-side env access without ever
+        // sending the key or endpoint to the browser.
+        if (!configured()) {
+          return json(
+            { ok: false, error: "reviewer_access_unavailable", message: "Temporary reviewer access is not enabled on this deployment." },
+            200,
+          );
+        }
+        key = env("COSTERA_API_KEY") ?? "";
+        baseUrl = env("COSTERA_API_BASE_URL") ?? "";
+      } else {
+        const k = obj.key;
+        const u = obj.baseUrl;
+        if (typeof k !== "string" || k.trim().length === 0 || k.length > 512 || typeof u !== "string") {
+          return json({ ok: false, error: "invalid_credentials", message: "Provide tier, key and baseUrl." }, 400);
+        }
+        key = k;
+        baseUrl = u;
       }
       try {
         // reuse the same public-HTTPS guard as triage credentials

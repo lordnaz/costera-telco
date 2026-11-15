@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   AlertTriangle,
+  ArrowUpRight,
   BarChart3,
   BookOpen,
   Check,
@@ -8,11 +9,13 @@ import {
   FileText,
   History,
   Home,
+  Hourglass,
   Inbox,
   KeyRound,
   Layers,
   LineChart,
   Loader2,
+  Lock,
   Play,
   ReceiptText,
   Settings,
@@ -26,13 +29,15 @@ import { postJson, requestJson } from "./api";
 import {
   allTiersConfigured,
   credentialsPayload,
+  demoCredentialsPayload,
   effectiveModel,
   emptyCreds,
   sessionActive,
+  sessionModels,
   TIERS,
   tierConfigured,
 } from "./credentials";
-import type { SessionCreds } from "./credentials";
+import type { DemoAccessInfo, SessionCreds } from "./credentials";
 import type { Batch, Health, TriageResult } from "./types";
 import type { Desk, RunRecord, TierId, TestState, View } from "./components/bits";
 import { Drawer, idleTest, InfoNote, LaneBadge, ModelName, StageBadge } from "./components/bits";
@@ -60,7 +65,7 @@ const TITLES: Record<View, [string, string]> = {
   patterns: ["Evidence & patterns", "Recurring clusters observed in synthetic data, with quoted evidence."],
   findings: ["AI findings", "Model-generated cluster analysis — verify before acting."],
   brief: ["Escalation brief", "Deterministic draft assembled from evidence — review before sending."],
-  cost: ["Cost analytics", "Routed cost vs an all-Max baseline at assumed rates."],
+  cost: ["Cost analytics", "Routed cost vs an all-flagship baseline at assumed rates."],
   history: ["Run history", "Session runs with per-ticket request/response traces."],
   settings: ["Settings", "Workspace, appearance and routing policy."],
 };
@@ -92,6 +97,20 @@ export default function App() {
     max: idleTest(),
   });
   const [preflightOpen, setPreflightOpen] = useState(false);
+  const [demoInfo, setDemoInfo] = useState<DemoAccessInfo | null>(null);
+  const [demoMode, setDemoMode] = useState(false);
+  const [demoModels, setDemoModels] = useState({ decision: "", flash: "", max: "" });
+  const [demoEngine, setDemoEngine] = useState<"systemone" | "chat">("systemone");
+  const [demoConsentOpen, setDemoConsentOpen] = useState(false);
+
+  useEffect(() => {
+    if (!demoConsentOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDemoConsentOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [demoConsentOpen]);
 
   useEffect(() => {
     if (!preflightOpen) return;
@@ -139,6 +158,8 @@ export default function App() {
           setBatch(b);
           setSelected(b.tickets[0]?.id ?? null);
         }
+        const d = await requestJson<DemoAccessInfo>("/api/demo-access").catch(() => null);
+        if (alive && d && d.ok) setDemoInfo(d);
       } catch (e) {
         if (alive) setLoadError(e instanceof Error ? e.message : "Failed to load the triage desk.");
       }
@@ -153,9 +174,12 @@ export default function App() {
       setError("The triage desk is still loading. Try again in a moment.");
       return;
     }
-    if (health.mode === "live" && !health.configured) {
-      // Session (bring-your-own) mode: require all three tiers configured and Test-confirmed.
-      const problems = TIERS.filter((t) => !tierConfigured(creds, t.id) || tierStatus[t.id].state !== "ok");
+    if (health.mode === "live") {
+      // Both access paths require all three tiers Test-confirmed before a run:
+      // bring-your-own needs key+endpoint+model per tier; reviewer demo needs model+Test.
+      const problems = demoMode
+        ? TIERS.filter((t) => !demoModels[t.id].trim() || tierStatus[t.id].state !== "ok")
+        : TIERS.filter((t) => !tierConfigured(creds, t.id) || tierStatus[t.id].state !== "ok");
       if (problems.length > 0) {
         setPreflightOpen(true);
         return;
@@ -167,7 +191,11 @@ export default function App() {
       const payload = credentialsPayload(creds);
       const r = await postJson<TriageResult>("/api/triage", {
         includeTrace: true,
-        ...(payload ? { credentials: payload } : {}),
+        ...(demoMode
+          ? demoCredentialsPayload(demoModels, demoEngine)
+          : payload
+            ? { credentials: payload }
+            : {}),
       });
       if (!r.ok || !Array.isArray(r.tickets) || !Array.isArray(r.patterns) || typeof r.brief !== "string") {
         throw new Error("The triage service returned an invalid result.");
@@ -178,9 +206,9 @@ export default function App() {
           id: crypto.randomUUID(),
           at: new Date().toISOString(),
           mode: r.mode,
-          keySource: r.keySource ?? (payload ? "session" : "env"),
-          decisionEngine: r.decisionEngine ?? "systemone",
-          models: r.models ?? { decision: "decision-model-preview", flash: "qwen3.8-flash", max: "qwen3.8-max" },
+          keySource: r.keySource ?? (demoMode ? "env" : payload ? "session" : "env"),
+          decisionEngine: r.decisionEngine ?? (demoMode ? demoEngine : "systemone"),
+          models: r.models ?? (demoMode ? demoModels : sessionModels(creds)),
           stats: r.stats,
           trace: r.trace ?? [],
         },
@@ -192,7 +220,21 @@ export default function App() {
     } finally {
       setRunning(false);
     }
-  }, [health, batch, creds, tierStatus]);
+  }, [health, batch, creds, tierStatus, demoMode, demoModels, demoEngine]);
+
+  const enableDemo = useCallback(() => {
+    if (!demoInfo?.available || !demoInfo.models) return;
+    setDemoModels(demoInfo.models);
+    setDemoEngine(demoInfo.decisionEngine);
+    setDemoMode(true);
+    setDemoConsentOpen(false);
+    setTierStatusState({ decision: idleTest(), flash: idleTest(), max: idleTest() });
+  }, [demoInfo]);
+
+  const exitDemo = useCallback(() => {
+    setDemoMode(false);
+    setTierStatusState({ decision: idleTest(), flash: idleTest(), max: idleTest() });
+  }, []);
 
   const briefText = useCallback(() => {
     // The draft is deterministic server output; session marks never alter it.
@@ -256,6 +298,14 @@ export default function App() {
     setCreds,
     tierStatus,
     setTierStatus: (t, s) => setTierStatusState((prev) => ({ ...prev, [t]: s })),
+    demoInfo,
+    demoMode,
+    demoModels,
+    setDemoModels,
+    demoEngine,
+    setDemoEngine,
+    requestDemo: () => setDemoConsentOpen(true),
+    exitDemo,
     copyBrief,
     copied,
   };
@@ -331,13 +381,22 @@ export default function App() {
           {NAV.map((n) => navButton(n))}
         </nav>
         <div className="space-y-2 border-t px-4 py-4">
-          <div className="flex items-center gap-2.5 px-1">
-            <Layers className="size-4 text-muted-foreground" />
-            <div>
-              <p className="text-xs font-medium">Demo workspace</p>
-              <p className="text-[11px] text-muted-foreground">Synthetic data only</p>
-            </div>
-          </div>
+          <a
+            href="https://krackeddevs.com/profile/nazlamp"
+            target="_blank"
+            rel="noreferrer"
+            title="Built by Nazuru-san · Kracked Devs profile"
+            className="group block rounded-lg border border-teal-600/25 bg-gradient-to-br from-teal-50 to-emerald-50 px-3 py-2.5 shadow-sm shadow-teal-600/10 transition-colors hover:border-teal-600/50 dark:border-teal-500/25 dark:from-teal-950/50 dark:to-emerald-950/40 dark:hover:border-teal-400/50"
+          >
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-teal-700/80 dark:text-teal-300/80">
+              Built by
+            </p>
+            <p className="flex items-center gap-1 text-sm font-bold text-teal-800 dark:text-teal-200">
+              Nazuru-san
+              <ArrowUpRight className="size-3.5 opacity-50 transition-opacity group-hover:opacity-100" />
+            </p>
+            <p className="text-[11px] text-muted-foreground">Kracked Devs · demo workspace</p>
+          </a>
           {navButton({ view: "settings", label: "Settings", icon: Settings })}
         </div>
       </aside>
@@ -359,14 +418,27 @@ export default function App() {
                 <Badge className="bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200" title="Simulated classifier responses for local development — not live model calls">
                   Fixture mode
                 </Badge>
+              ) : demoMode ? (
+                <Badge
+                  className="cursor-pointer bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200"
+                  title="Owner-provided server-side access for the bounty review window only — retired after review. Click to open Settings."
+                  onClick={() => setView("settings")}
+                >
+                  <Hourglass /> Temporary reviewer access
+                </Badge>
               ) : byo ? (
-                <Badge className="bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-200" title="Reviewer-supplied session API key — memory only, cleared on refresh, used for this request alone">
+                <Badge
+                  className="cursor-pointer bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-200"
+                  title="Reviewer-supplied session API key — memory only, cleared on refresh, used for this request alone. Click to open Settings."
+                  onClick={() => setView("settings")}
+                >
                   <span className="size-1.5 rounded-full bg-teal-500" /> Session API key
                 </Badge>
               ) : (
                 <Badge
-                  className="bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200"
-                  title="This build has no server-side key — open Settings to add your own API access"
+                  className="cursor-pointer bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200"
+                  title="This build has no server-side key — click to open Settings and add your own API access"
+                  onClick={() => setView("settings")}
                 >
                   <KeyRound /> Add access in Settings
                 </Badge>
@@ -407,8 +479,8 @@ export default function App() {
                   title={
                     result
                       ? "Triage already completed — reload the page to run again"
-                      : health?.mode === "live" && !health.configured
-                        ? "Opens a setup checklist until all three tiers are configured and Test-confirmed"
+                      : health?.mode === "live"
+                        ? "Opens a setup checklist until all three tiers are Test-confirmed"
                         : undefined
                   }
                 >
@@ -446,13 +518,39 @@ export default function App() {
             </Alert>
           )}
 
-          {byo && !tiersComplete && (
-            <InfoNote tone="amber">
-              Session setup is incomplete — every tier needs a key, an HTTPS endpoint and a chosen model before triage
-              can run. Open Settings to finish the setup.
-            </InfoNote>
-          )}
-
+          {health?.mode === "live" &&
+            ((demoMode && TIERS.some((t) => tierStatus[t.id].state !== "ok")) ||
+              (!demoMode && (!byo || !tiersComplete))) && (
+              <div className="flex flex-wrap items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
+                <AlertTriangle className="size-3.5 shrink-0" />
+                <span className="min-w-0 flex-1">
+                  {demoMode
+                    ? "Temporary reviewer access is active — the owner's key and endpoint stay server-side. This access is retired after the bounty review."
+                    : !byo
+                      ? "No API access this session — add your own key in Settings, or use the temporary reviewer access offered there."
+                      : "Session setup is incomplete — every tier needs a key, an HTTPS endpoint and a chosen model before triage can run."}
+                </span>
+                <Button
+                  size="sm"
+                  className={
+                    demoMode
+                      ? "bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-sm shadow-teal-600/25 hover:from-teal-500 hover:to-emerald-500 hover:text-white"
+                      : "bg-gradient-to-r from-red-600 to-rose-500 text-white shadow-sm shadow-red-600/25 hover:from-red-500 hover:to-rose-400 hover:text-white"
+                  }
+                  onClick={() => setView("settings")}
+                >
+                  {demoMode ? (
+                    <>
+                      <Check /> Test all three tiers
+                    </>
+                  ) : (
+                    <>
+                      <KeyRound /> Set API access first
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
           {loadError && (
             <Alert variant="destructive">
               <AlertTriangle />
@@ -496,8 +594,20 @@ export default function App() {
           {view === "history" && <HistoryView desk={desk} />}
           {view === "settings" && <SettingsView desk={desk} />}
 
-          <footer className="pb-2 pt-4 text-center text-xs text-muted-foreground">
-            COSTERA bounty demo · fictional telco · all data synthetic · no real provider names or customer data
+          <footer className="space-y-1 pb-2 pt-4 text-center text-xs text-muted-foreground">
+            <p>COSTERA bounty demo · fictional telco · all data synthetic · your own API access, never stored</p>
+            <p>
+              Built by{" "}
+              <a
+                href="https://krackeddevs.com/profile/nazlamp"
+                target="_blank"
+                rel="noreferrer"
+                className="font-semibold text-teal-700 underline decoration-teal-600/40 underline-offset-2 hover:text-teal-600 dark:text-teal-300 dark:hover:text-teal-200"
+              >
+                Nazuru-san
+              </a>{" "}
+              · Kracked Devs
+            </p>
           </footer>
         </main>
       </div>
@@ -515,33 +625,38 @@ export default function App() {
           />
           <div className="rise scrollbar-thin relative max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-xl border bg-card p-4 shadow-2xl sm:p-5">
             <h2 id="preflight-title" className="flex items-center gap-2 text-base font-semibold tracking-tight">
-              <ShieldAlert className="size-4 text-amber-600" /> Finish the 3-tier AI setup first
+              <ShieldAlert className="size-4 text-amber-600" />
+              {demoMode ? "Test the 3-tier reviewer access first" : "Finish the 3-tier AI setup first"}
             </h2>
             <p className="mt-1.5 text-sm text-muted-foreground">
-              Triage needs all three tiers configured — a key, an HTTPS endpoint and a chosen model — each confirmed
-              accessible with Test. This build holds no server-side key, so your own access is what gets used —
-              fixture mode (local development) is the only run that skips this step.
+              {demoMode
+                ? "Temporary reviewer access supplies the key and endpoint server-side — they are never shown here. Each tier still needs a chosen model (pre-filled with the verified setup) and a passing Test before triage can run."
+                : "Triage needs all three tiers configured — a key, an HTTPS endpoint and a chosen model — each confirmed accessible with Test. Your own access is what gets used — fixture mode (local development) is the only run that skips this step."}
             </p>
             <ul className="mt-3 space-y-2">
               {TIERS.map((t) => {
-                const configured = tierConfigured(creds, t.id);
+                const model = demoMode ? demoModels[t.id].trim() : effectiveModel(creds, t.id);
+                const configured = demoMode ? model.length > 0 : tierConfigured(creds, t.id);
                 const status = tierStatus[t.id];
                 const chip = !configured
-                  ? ["bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300", "Add key, endpoint & model"]
+                  ? [
+                      "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300",
+                      demoMode ? "Choose a model in Settings" : "Add key, endpoint & model",
+                    ]
                   : status.state === "ok"
                     ? ["bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300", "Ready"]
                     : status.state === "error"
-                      ? ["bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300", "Test failed — fix key or URL"]
+                      ? ["bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300", "Test failed — check Settings"]
                       : status.state === "testing"
                         ? ["bg-muted text-muted-foreground", "Testing…"]
                         : ["bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300", "Press Test to confirm access"];
                 return (
                   <li key={t.id} className="flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <span className="text-xs font-bold uppercase tracking-wide text-teal-700 dark:text-teal-300">
                       {t.label}
                     </span>
-                    {effectiveModel(creds, t.id) ? (
-                      <ModelName>{effectiveModel(creds, t.id)}</ModelName>
+                    {model ? (
+                      <ModelName>{model}</ModelName>
                     ) : (
                       <span className="text-xs italic text-muted-foreground">no selection</span>
                     )}
@@ -554,9 +669,8 @@ export default function App() {
             </ul>
             <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
               <Button
-                variant="ghost"
                 size="sm"
-                className="justify-start sm:mr-auto"
+                className="justify-start bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-sm shadow-teal-600/25 hover:from-teal-500 hover:to-emerald-500 hover:text-white sm:mr-auto"
                 onClick={() => {
                   setPreflightOpen(false);
                   setView("how");
@@ -578,6 +692,78 @@ export default function App() {
                   Open Settings
                 </Button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {demoConsentOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="demo-consent-title"
+        >
+          <div
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] dark:bg-black/60"
+            onClick={() => setDemoConsentOpen(false)}
+          />
+          <div className="rise scrollbar-thin relative max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-xl border bg-card p-4 shadow-2xl sm:p-5">
+            <h2 id="demo-consent-title" className="flex items-center gap-2 text-base font-semibold tracking-tight">
+              <Hourglass className="size-4 text-violet-600 dark:text-violet-400" /> Temporary reviewer access
+            </h2>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              No API key of your own? The desk can borrow the owner's pre-configured access, held server-side, so you
+              can review the full workflow end to end.
+            </p>
+            <ul className="mt-3 space-y-2 text-sm">
+              <li className="flex gap-2">
+                <Hourglass className="mt-0.5 size-4 shrink-0 text-violet-600 dark:text-violet-400" />
+                <span>
+                  <span className="font-medium">Temporary by design.</span> Available only for the bounty review
+                  window; disabled once the submission has been reviewed and approved.
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <KeyRound className="mt-0.5 size-4 shrink-0 text-teal-600 dark:text-teal-400" />
+                <span>
+                  <span className="font-medium">After retirement, only your own key works.</span> The owner removes the
+                  pre-setup env; bring-your-own access in Settings remains the permanent path.
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <Lock className="mt-0.5 size-4 shrink-0 text-teal-600 dark:text-teal-400" />
+                <span>
+                  <span className="font-medium">Key and endpoint stay hidden.</span> They are never sent to your
+                  browser and cannot be viewed or edited while this mode is on.
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <Check className="mt-0.5 size-4 shrink-0 text-teal-600 dark:text-teal-400" />
+                <span>
+                  <span className="font-medium">Test before you run.</span> Press Test on all three tiers in Settings;
+                  Run triage unlocks only after all three confirm access.
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <span>
+                  <span className="font-medium">Nothing is stored.</span> Refreshing the page or exiting this mode
+                  returns the desk to bring-your-own access.
+                </span>
+              </li>
+            </ul>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setDemoConsentOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                className="bg-gradient-to-r from-violet-600 to-teal-600 text-white shadow-sm shadow-violet-600/25 hover:from-violet-500 hover:to-teal-500 hover:text-white"
+                onClick={enableDemo}
+              >
+                <Hourglass /> Use temporary access
+              </Button>
             </div>
           </div>
         </div>
@@ -660,8 +846,8 @@ export default function App() {
               </h4>
               {ticketTrace.some((t) => t.stage === "tier2_heavy") && (
                 <p className="mt-1 text-[11px] text-muted-foreground">
-                  Tier 2 heavy runs per cluster, not per ticket — the Max call below covers this ticket's analysed
-                  cluster.
+                  Tier 2 heavy runs per cluster, not per ticket — the heavy-lane call below covers this ticket's
+                  analysed cluster.
                 </p>
               )}
               <div className="mt-2 space-y-2">
@@ -688,7 +874,9 @@ export default function App() {
           )}
           {openTicketTr?.summary && (
             <InfoNote>
-              Summary above generated by <ModelName>qwen3.8-flash</ModelName> — model output, verify before use.
+              Summary above generated by{" "}
+              {result?.models?.flash ? <ModelName>{result.models.flash}</ModelName> : "the light-lane model"} — model
+              output, verify before use.
             </InfoNote>
           )}
         </div>

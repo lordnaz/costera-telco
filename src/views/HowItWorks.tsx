@@ -149,9 +149,9 @@ export function HowItWorks({ desk }: { desk: Desk }) {
               n: "2",
               body: (
                 <>
-                  Pick the models for the three tiers — <span className="font-medium">Apply verified model setup</span>{" "}
-                  sets the trio this flow was tested end-to-end with — then press <span className="font-medium">Test</span>{" "}
-                  on each tier until access is confirmed.
+                  Pick the models for the three tiers — the starred (Recommended) trio is the one this flow was tested
+                  end-to-end with — then press <span className="font-medium">Test</span> on each tier until access is
+                  confirmed.
                 </>
               ),
             },

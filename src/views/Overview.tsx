@@ -18,6 +18,7 @@ import architectureUrl from "@/docs/architecture.png";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { computeCost, ratesForModels } from "../cost";
+import { sessionModels } from "../credentials";
 import type { Desk } from "../components/bits";
 import { InfoNote, Kpi, SectionCard, TicketChip, usd } from "../components/bits";
 import { ModelCost } from "../components/ModelCost";
@@ -69,7 +70,8 @@ export function Overview({ desk }: { desk: Desk }) {
           <div className="space-y-3 border-t px-5 py-4">
             <p className="text-sm leading-relaxed">
               Tier 1 reads intent and complexity for every ticket. A policy then sends each one to a free
-              knowledge-base lookup, a human queue, or Tier 2 — flash for summaries, Max only for clusters that
+              knowledge-base lookup, a human queue, or Tier 2 — the light lane for summaries, the heavy lane only for
+              clusters that
               genuinely need cross-ticket reading. What you get back is evidence rather than opinion: ticket IDs,
               quoted lines, counts and confidence, plus a draft escalation brief and an estimate of what the routing
               saved.
@@ -126,7 +128,7 @@ export function Overview({ desk }: { desk: Desk }) {
           delay={180}
           label="Estimated cost savings"
           value={cost?.savingsPct != null ? `${cost.savingsPct.toFixed(0)}%` : "—"}
-          sub="vs. Max-only baseline · assumed rates"
+          sub="vs. all-flagship baseline · assumed rates"
         />
       </div>
 
@@ -327,12 +329,16 @@ export function Overview({ desk }: { desk: Desk }) {
         </button>
         {detailsOpen && (
           <div className="space-y-4 border-t px-5 py-4">
-            <ModelCost stats={result?.stats ?? null} models={result?.models} />
+            <ModelCost
+              stats={result?.stats ?? null}
+              models={result?.models}
+              session={desk.demoMode ? desk.demoModels : sessionModels(desk.creds)}
+            />
             {result && (
               <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 <span className="font-medium text-foreground">Run trace:</span>
-                <span>{stageCount("tier1")} Tier 1 calls</span>·<span>{stageCount("tier2_light")} flash</span>·
-                <span>{stageCount("tier2_heavy")} Max</span>
+                <span>{stageCount("tier1")} Tier 1 calls</span>·<span>{stageCount("tier2_light")} light</span>·
+                <span>{stageCount("tier2_heavy")} heavy</span>
                 <button type="button" onClick={() => desk.openLog()} className="font-semibold text-teal-700 hover:underline dark:text-teal-300">
                   View run log
                 </button>

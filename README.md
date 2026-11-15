@@ -1,6 +1,7 @@
 # COSTERA — Triage Desk
 
-Kracked Devs bounty entry: **Build for Better Connectivity**.
+Kracked Devs bounty entry: **Build for Better Connectivity** — built by
+[Nazuru-san](https://krackeddevs.com/profile/nazlamp).
 
 A triage desk for a support agent at **ZephyrTel, a fictional telco**. It reads a batch of
 scattered tickets, routes each one to the cheapest lane that can handle it, and hands off to a
@@ -30,7 +31,7 @@ per-model rates — never billing truth.
 1. Open the site — it lands on **Overview**. **How it works** (bottom of the sidebar) explains the
    routing and repeats the diagram.
 2. **Settings → Bring your own API access**: paste your key and OpenAI-compatible base URL, pick a
-   model per tier (or press *Apply verified model setup*), then **Test** each tier.
+   model per tier (the starred Recommended trio is verified end-to-end), then **Test** each tier.
 3. **Run triage** on Overview. Patterns, brief and cost analytics fill in.
 
 Starred as recommended: **Tier 1** `decision-model-preview` (or `jeff`), **Tier 2 light**
@@ -39,12 +40,17 @@ but only this Qwen trio is verified end-to-end.
 
 ## Model access
 
-- **Session keys only.** Entered in Settings, held in memory, used server-side for that one
+- **Session keys by default.** Entered in Settings, held in memory, used server-side for that one
   request — never stored, logged or written to browser storage. A refresh clears them.
-- **No server secrets, no `.env`.** Nothing reads environment variables, so the app can never
-  spend anyone else's key. Endpoints must be public HTTPS; loopback and private hosts are rejected.
+- **Temporary reviewer access (optional).** Reviewers without a key can opt in from Settings after
+  a consent notice; the server then uses its own pre-setup env (`COSTERA_API_KEY`,
+  `COSTERA_API_BASE_URL`, optional `COSTERA_MODEL_*`). The key and endpoint never reach the browser
+  and cannot be edited in that mode; all three tiers must pass Test before a run. The owner retires
+  the env after the bounty review — afterwards only session keys work. Without the opt-in flag the
+  env is never consulted.
 - **Nothing is persisted.** There is no database, so reloading resets the desk and the setup;
-  run logs are the durable audit trail.
+  run logs are the durable audit trail. Endpoints must be public HTTPS; loopback and private hosts
+  are rejected.
 
 ## Layout
 

@@ -1,13 +1,19 @@
-// DEV-ONLY live local server: real Tier 1/2 clients, session credentials only.
-// This server reads NO environment variables — there is no owner key here.
-// Enter the API key, endpoint and model choices in the app's Settings page; they live in
-// memory for one browser session and are sent per request. Stop the fixture server
-// (dev/node-function-local.mjs) first — both use port 8000.
+// DEV-ONLY live local server: real Tier 1/2 clients, session credentials by default.
+// Optionally loads .env (gitignored) for the temporary reviewer opt-in: the env key is
+// used ONLY when a request carries demoAccess=true after UI consent, and is never sent
+// to the browser. Without .env, or without the flag, Settings session keys are the only
+// way to reach real models. Stop the fixture server (dev/node-function-local.mjs) first
+// — both use port 8000.
 import { createServer } from "node:http";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { createHandler } from "../server/handler.ts";
 
-const env = () => undefined;
+try {
+  process.loadEnvFile(new URL("../.env", import.meta.url));
+} catch {
+  // no .env present — bring-your-own session keys only
+}
+const env = (name) => process.env[name];
 const sink = (record) => {
   mkdirSync("logs", { recursive: true });
   const file = `logs/triage-${record.at.replace(/[:.]/g, "-")}-${record.runId.slice(0, 8)}.json`;
@@ -45,5 +51,9 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(8000, "127.0.0.1", () => {
-  console.log("LIVE local Function server on http://127.0.0.1:8000 (no env secrets — configure access in Settings)");
+  console.log(
+    process.env.COSTERA_API_KEY
+      ? "LIVE local Function server on http://127.0.0.1:8000 (temporary reviewer access available; BYO session keys otherwise)"
+      : "LIVE local Function server on http://127.0.0.1:8000 (no env secrets — configure access in Settings)",
+  );
 });
