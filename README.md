@@ -14,8 +14,8 @@ selectable options for your own API access — the desk itself is not branded as
 
 **Try it in two minutes** (your own key, your own quota):
 
-1. Open the site — it lands on **How it works**, with the architecture diagram and a short
-   explanation of the routing.
+1. Open the site — it lands on **Overview**. The **How it works** tab (bottom of the sidebar) holds
+   the architecture diagram and a short explanation of the routing.
 2. **Settings → Bring your own API access**: paste your provider key and OpenAI-compatible base
    URL, pick the three tier models (or press *Apply verified model setup*), then **Test** each tier.
 3. **Run triage**. Overview, Evidence & patterns, Escalation brief and Cost analytics fill in.
@@ -56,8 +56,7 @@ in a footnote; every figure is labelled an estimate, not billing truth.
 
 | View | What it shows |
 | --- | --- |
-| **How it works** (default landing) | Architecture diagram, the four stages, why the routing is built this way, and the reviewer start path |
-| Overview | KPIs, routing summary, worklist + ticket detail, pattern and brief previews, collapsible model/cost readout |
+| **Overview** (default landing) | KPIs, routing summary, worklist + ticket detail, pattern and brief previews, collapsible model/cost readout |
 | Ticket inbox | All tickets, searchable, filterable by lane, sortable, paginated |
 | Human review | The unsure / money-touching queue with summaries and cluster analysis attached |
 | Evidence & patterns | Recurring clusters with ticket IDs, quoted lines, counts and confidence |
@@ -65,6 +64,7 @@ in a footnote; every figure is labelled an estimate, not billing truth.
 | Escalation brief | Deterministic draft assembled from evidence; copy for review |
 | Run history | This tab's runs with models used, key source and the full request/response trace |
 | Cost analytics | Per-run cost at that run's own model rates, plus routed vs all-flagship comparison |
+| How it works | Architecture diagram, the four stages, why the routing is built this way, and the reviewer start path |
 | Settings | Appearance, workspace info, routing policy, data safety, and bring-your-own API access |
 
 "Add to brief" on a ticket is a **local review mark only**: it never changes the draft, is not
@@ -211,8 +211,8 @@ Session credentials are never persisted anywhere by choice: keeping them out of 
 makes "your key, your quota, one request at a time" true. Only non-secret state (the last run and
 its stats) would move to a durable store — Cloudflare D1 or KV keyed by batch, with the run log
 already providing the same records server-side. That is outside the current milestone, and the
-UI states the reset behaviour on the banner, the How it works landing view, Settings and Run
-history so nobody loses work without knowing.
+UI states the reset behaviour on the banner, the How it works view, Settings and Run history so
+nobody loses work without knowing.
 
 ## Deployment
 
