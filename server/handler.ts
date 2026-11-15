@@ -7,9 +7,17 @@
 // never write headers, the API key, or the endpoint hostname. Logging failures never break triage.
 
 import { BATCH_LABEL, TELCO, TICKETS } from "./data.ts";
-import { createDecisionClassifier } from "./decision.ts";
+import {
+  CredentialsError,
+  effectiveCredentials,
+  parseSessionCredentials,
+  sessionActive,
+  tierEnvReader,
+} from "./credentials.ts";
+import type { SessionCredentials, TierId } from "./credentials.ts";
+import { createDecisionClassifier, CHAT_CLASSIFIER_MODEL, DECISION_MODEL } from "./decision.ts";
 import type { ClassifyFn, EnvReader } from "./decision.ts";
-import { createFlashSummarizer, createMaxAnalyzer } from "./tier2.ts";
+import { createFlashSummarizer, createMaxAnalyzer, FLASH_MODEL, MAX_MODEL } from "./tier2.ts";
 import { runTriage } from "./triage.ts";
 import type { Tier2Deps, TraceEntry, TriageStats } from "./triage.ts";
 
@@ -23,6 +31,9 @@ export interface RunLog {
   runId: string;
   at: string;
   mode: "live" | "fixture";
+  keySource: "env" | "session";
+  decisionEngine: "systemone" | "chat";
+  models: { decision: string; flash: string; max: string };
   stats: TriageStats;
   trace: TraceEntry[];
 }
@@ -64,18 +75,9 @@ export function createHandler(env: EnvReader, opts: HandlerOpts = {}) {
 
     if (route === "triage") {
       if (request.method !== "POST") return json({ ok: false, error: "method_not_allowed" }, 405);
-      if (!fixtureClassify && !configured()) {
-        return json(
-          {
-            ok: false,
-            error: "service_not_configured",
-            message: "Server secrets are not set. The site owner must enter COSTERA_API_KEY and COSTERA_API_BASE_URL in the hosting environment settings.",
-          },
-          503,
-        );
-      }
       let ticketIds: string[] | undefined;
       let includeTrace = false;
+      let session: SessionCredentials | null = null;
       let raw: string;
       try {
         raw = await request.text();
@@ -93,6 +95,15 @@ export function createHandler(env: EnvReader, opts: HandlerOpts = {}) {
         if (typeof body === "object" && body !== null) {
           const obj = body as Record<string, unknown>;
           includeTrace = obj.includeTrace === true;
+          try {
+            session = parseSessionCredentials(obj.credentials);
+          } catch (e) {
+            // credential values are never echoed or logged
+            return json(
+              { ok: false, error: "invalid_credentials", message: e instanceof CredentialsError ? e.message : "Invalid credentials." },
+              400,
+            );
+          }
           if ("ticketIds" in obj) {
             const ids = obj.ticketIds;
             if (!Array.isArray(ids) || ids.length === 0 || ids.length > 50 || ids.some((x) => typeof x !== "string")) {
@@ -106,17 +117,40 @@ export function createHandler(env: EnvReader, opts: HandlerOpts = {}) {
           }
         }
       }
-      const classify = fixtureClassify ?? createDecisionClassifier(env);
-      const tier2 =
-        opts.tier2 ??
-        (configured() ? { summarize: createFlashSummarizer(env), analyze: createMaxAnalyzer(env) } : undefined);
+      const byo = sessionActive(session);
+      if (!fixtureClassify && !configured() && !byo) {
+        return json(
+          {
+            ok: false,
+            error: "service_not_configured",
+            message:
+              "No API access configured. Supply your own session API key, endpoint and model per tier in Settings (memory-only, cleared on refresh), then press Test on each tier.",
+          },
+          503,
+        );
+      }
+      const eff = effectiveCredentials(session, env);
+      const reader = (t: TierId) => tierEnvReader(eff.tiers[t], eff.decisionEngine, env);
+      const classify = fixtureClassify ?? createDecisionClassifier(reader("decision"));
+      const tier2: Tier2Deps =
+        opts.tier2 ?? { summarize: createFlashSummarizer(reader("flash")), analyze: createMaxAnalyzer(reader("max")) };
       try {
         const result = await runTriage(classify, ticketIds, mode, tier2);
+        result.keySource = byo ? "session" : "env";
+        result.decisionEngine = eff.decisionEngine;
+        result.models = {
+          decision: eff.tiers.decision.model || (eff.decisionEngine === "chat" ? CHAT_CLASSIFIER_MODEL : DECISION_MODEL),
+          flash: eff.tiers.flash.model || FLASH_MODEL,
+          max: eff.tiers.max.model || MAX_MODEL,
+        };
         if (sink) {
           const record: RunLog = {
             runId: crypto.randomUUID(),
             at: new Date().toISOString(),
             mode,
+            keySource: result.keySource,
+            decisionEngine: result.decisionEngine,
+            models: result.models,
             stats: result.stats,
             trace: result.trace,
           };
@@ -131,6 +165,59 @@ export function createHandler(env: EnvReader, opts: HandlerOpts = {}) {
         return json(rest);
       } catch {
         return json({ ok: false, error: "triage_failed", message: "Triage could not complete." }, 500);
+      }
+    }
+
+    if (route === "credentials") {
+      if (request.method !== "POST") return json({ ok: false, error: "method_not_allowed" }, 405);
+      let body: unknown;
+      try {
+        body = await request.json();
+      } catch {
+        return json({ ok: false, error: "invalid_body" }, 400);
+      }
+      if (typeof body !== "object" || body === null) return json({ ok: false, error: "invalid_body" }, 400);
+      const obj = body as Record<string, unknown>;
+      const tier = obj.tier;
+      const key = obj.key;
+      const baseUrl = obj.baseUrl;
+      if (
+        (tier !== "decision" && tier !== "flash" && tier !== "max") ||
+        typeof key !== "string" ||
+        key.trim().length === 0 ||
+        key.length > 512 ||
+        typeof baseUrl !== "string"
+      ) {
+        return json({ ok: false, error: "invalid_credentials", message: "Provide tier, key and baseUrl." }, 400);
+      }
+      try {
+        // reuse the same public-HTTPS guard as triage credentials
+        parseSessionCredentials({ tiers: { [tier]: { key, baseUrl } } });
+      } catch (e) {
+        return json(
+          { ok: false, error: "invalid_credentials", message: e instanceof CredentialsError ? e.message : "Invalid credentials." },
+          400,
+        );
+      }
+      const href = baseUrl.endsWith("/") ? baseUrl : baseUrl + "/";
+      try {
+        const res = await fetch(new URL("models", href), {
+          headers: { Authorization: `Bearer ${key.trim()}` },
+          signal: AbortSignal.timeout(10000),
+        });
+        if (!res.ok) {
+          return json({ ok: false, error: "credentials_rejected", message: `Endpoint returned HTTP ${res.status}.` }, 200);
+        }
+        let count: number | null = null;
+        try {
+          const j = (await res.json()) as { data?: unknown[] };
+          if (Array.isArray(j.data)) count = j.data.length;
+        } catch {
+          // model list shape is optional; HTTP 200 already proves access
+        }
+        return json({ ok: true, models: count });
+      } catch {
+        return json({ ok: false, error: "credentials_unreachable", message: "Endpoint could not be reached." }, 200);
       }
     }
 

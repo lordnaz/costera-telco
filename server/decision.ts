@@ -32,6 +32,8 @@ export type ClassifyFn = (ticket: Ticket) => Promise<Decision>;
 export type EnvReader = (name: string) => string | undefined;
 
 export const DECISION_MODEL = "decision-model-preview";
+export const CHAT_CLASSIFIER_MODEL = "deepseek-chat";
+export type DecisionEngine = "systemone" | "chat";
 export const INTENT_CHOICES = ["billing", "technical", "account", "roaming", "other"];
 export const COMPLEXITY_CHOICES = ["routine", "complex"];
 
@@ -84,11 +86,11 @@ export function parseDecision(json: unknown, fallbackLatencyMs: number): Decisio
   };
 }
 
-export function buildDecisionRequest(ticket: Ticket): { endpointPath: string; body: unknown } {
+export function buildDecisionRequest(ticket: Ticket, model: string = DECISION_MODEL): { endpointPath: string; body: unknown } {
   return {
     endpointPath: "systemone",
     body: {
-      model: DECISION_MODEL,
+      model,
       state: { ticket_id: ticket.id, content: ticket.text },
       questions: {
         intent: {
@@ -118,6 +120,76 @@ export function buildDecisionRequest(ticket: Ticket): { endpointPath: string; bo
   };
 }
 
+// Chat-engine alternative: any chat model (e.g. the flagship) acts as the classifier
+// through /chat/completions with a strict JSON prompt. Confidence is self-reported by
+// the model (no calibrated probabilities), which the UI labels accordingly.
+export function buildChatClassifyRequest(ticket: Ticket, model: string): { endpointPath: string; body: unknown } {
+  return {
+    endpointPath: "chat/completions",
+    body: {
+      model,
+      temperature: 0,
+      messages: [
+        {
+          role: "system",
+          content:
+            'You are the Tier 1 classifier for a telecom support triage desk. Reply with ONLY a JSON object: {"intent": {"choice": string, "confidence": number}, "complexity": {"choice": string, "confidence": number}}. intent.choice must be exactly one of billing, technical, account, roaming, other. billing = money: bills, charges, fees, proration, plan-change costs, payments, refunds, credits. technical = service working: no data, no signal, outages, slow connection, SIM or device faults. account = account state: balance, current plan, bill due dates, account status. roaming = travel, roaming add-ons, international usage. other = only if the text truly fits none of them. complexity.choice must be routine (answerable by a deterministic lookup or standard procedure) or complex (needs cross-ticket analysis or judgement). confidence is your calibrated certainty from 0 to 1; use low values when the text is vague or ambiguous. Never invent facts.',
+        },
+        { role: "user", content: `Ticket ${ticket.id}: ${ticket.text}` },
+      ],
+    },
+  };
+}
+
+function stripFences(text: string): string {
+  const t = text.trim();
+  if (t.startsWith("```")) return t.replace(/^```[a-zA-Z]*\s*/, "").replace(/```\s*$/, "").trim();
+  return t;
+}
+
+export function parseChatDecision(json: unknown, fallbackLatencyMs: number): Decision {
+  const mismatch = (msg: string) => new DecisionError("decision_contract_mismatch", msg);
+  if (typeof json !== "object" || json === null) throw mismatch("Unexpected chat response shape.");
+  const obj = json as Record<string, unknown>;
+  const choices = obj.choices as { message?: { content?: unknown } }[] | undefined;
+  const content = choices?.[0]?.message?.content;
+  if (typeof content !== "string") throw mismatch("Chat response has no message content.");
+  let parsed: Record<string, unknown>;
+  try {
+    const candidate = JSON.parse(stripFences(content));
+    if (typeof candidate !== "object" || candidate === null) throw new Error("not an object");
+    parsed = candidate as Record<string, unknown>;
+  } catch {
+    throw mismatch("Chat classifier returned non-JSON content.");
+  }
+  const field = (name: string, allowed: string[]): DecisionField => {
+    const raw = parsed[name];
+    if (typeof raw !== "object" || raw === null) throw mismatch(`Chat classifier field ${name} is missing.`);
+    const f = raw as Record<string, unknown>;
+    if (typeof f.choice !== "string" || !allowed.includes(f.choice)) {
+      throw mismatch(`Chat classifier field ${name} has an invalid choice.`);
+    }
+    if (typeof f.confidence !== "number" || !Number.isFinite(f.confidence)) {
+      throw mismatch(`Chat classifier field ${name} has no numeric confidence.`);
+    }
+    return {
+      type: "choice",
+      choice: f.choice,
+      confidence: Math.min(1, Math.max(0, f.confidence)),
+      probabilities: {},
+    };
+  };
+  const usage = obj.usage as Record<string, unknown> | undefined;
+  return {
+    fields: { intent: field("intent", INTENT_CHOICES), complexity: field("complexity", COMPLEXITY_CHOICES) },
+    inputTokens: usage && typeof usage.prompt_tokens === "number" ? usage.prompt_tokens : null,
+    latencyMs: fallbackLatencyMs,
+    requestId: typeof obj.id === "string" ? obj.id : null,
+    request: null,
+    raw: json,
+  };
+}
+
 export function createDecisionClassifier(env: EnvReader): ClassifyFn {
   return async (ticket: Ticket): Promise<Decision> => {
     const key = env("COSTERA_API_KEY");
@@ -134,7 +206,10 @@ export function createDecisionClassifier(env: EnvReader): ClassifyFn {
     if (baseUrl.protocol !== "https:") {
       throw new DecisionError("invalid_base_url", "Server endpoint must use HTTPS.");
     }
-    const { endpointPath, body } = buildDecisionRequest(ticket);
+    const engine: DecisionEngine = env("COSTERA_DECISION_ENGINE") === "chat" ? "chat" : "systemone";
+    const model = env("COSTERA_MODEL") || (engine === "chat" ? CHAT_CLASSIFIER_MODEL : DECISION_MODEL);
+    const { endpointPath, body } =
+      engine === "chat" ? buildChatClassifyRequest(ticket, model) : buildDecisionRequest(ticket, model);
     const href = baseUrl.href.endsWith("/") ? baseUrl.href : baseUrl.href + "/";
     const endpoint = new URL(endpointPath, href);
 
@@ -149,7 +224,7 @@ export function createDecisionClassifier(env: EnvReader): ClassifyFn {
             "Content-Type": "application/json",
           },
           body: JSON.stringify(body),
-          signal: AbortSignal.timeout(20000),
+          signal: AbortSignal.timeout(engine === "chat" ? 30000 : 20000),
         });
       } catch {
         throw new DecisionError("upstream_unreachable", "Classification service is unreachable.");
@@ -163,7 +238,8 @@ export function createDecisionClassifier(env: EnvReader): ClassifyFn {
       } catch {
         throw new DecisionError("decision_contract_mismatch", "Classification service returned non-JSON.");
       }
-      const decision = parseDecision(json, Date.now() - started);
+      const decision =
+        engine === "chat" ? parseChatDecision(json, Date.now() - started) : parseDecision(json, Date.now() - started);
       decision.request = body;
       return decision;
     } catch (e) {

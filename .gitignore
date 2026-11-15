@@ -1,7 +1,7 @@
-# Secrets — never commit real credentials
+# Secrets — the app reads no env files; these rules stay as defense in depth
+# in case anyone drops a credentials file into the working tree.
 .env
 .env.*
-!.env.example
 
 # Dependencies
 node_modules/

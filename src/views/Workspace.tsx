@@ -1,0 +1,968 @@
+import { useState } from "react";
+import {
+  ArrowRight,
+  BadgeCheck,
+  BarChart3,
+  Check,
+  Copy,
+  Eye,
+  EyeOff,
+  FileText,
+  FlaskConical,
+  History,
+  Inbox,
+  KeyRound,
+  Loader2,
+  Monitor,
+  Moon,
+  ShieldAlert,
+  Sparkles,
+  Sun,
+  Trash2,
+  Users,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { postJson } from "../api";
+import { computeCost, ratesForModels } from "../cost";
+import { decisionReady, effective, effectiveModel, emptyCreds, sessionActive, TIERS } from "../credentials";
+import type { SessionCreds, TierEntry, TierId } from "../credentials";
+import {
+  CLASSIFIER_CHAT_OPTIONS,
+  DECISION_CONTRACT_OPTIONS,
+  families,
+  HEAVY_OPTIONS,
+  isRecommended,
+  LIGHT_OPTIONS,
+} from "../models";
+import type { CatalogModel } from "../models";
+import type { Desk } from "../components/bits";
+import { EmptyState, idleTest, InfoNote, ModelName, SectionCard, TicketChip, usd } from "../components/bits";
+import type { TestState } from "../components/bits";
+import { ModelCost } from "../components/ModelCost";
+import { TicketDetail, TicketTable } from "../components/TicketTable";
+
+export function TicketsView({ desk }: { desk: Desk }) {
+  const ticket = desk.batch?.tickets.find((t) => t.id === desk.selected);
+  const tr = desk.result?.tickets.find((t) => t.id === desk.selected);
+  return (
+    <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <SectionCard title="Ticket inbox" sub={`${desk.batch?.tickets.length ?? 0} synthetic tickets · ${desk.batch?.batchLabel ?? ""}`}>
+        <TicketTable
+          batch={desk.batch}
+          result={desk.result}
+          selected={desk.selected}
+          onSelect={desk.setSelected}
+          onOpen={desk.openTicket}
+          pageSize={10}
+        />
+      </SectionCard>
+      <SectionCard title="Ticket detail" sub="Message, rationale and evidence" className="xl:sticky xl:top-20">
+        <TicketDetail
+          ticket={ticket}
+          tr={tr}
+          result={desk.result}
+          onOpen={desk.openTicket}
+          onAdd={desk.addBrief}
+          added={desk.extras.some((e) => e.ticketId === desk.selected)}
+          onViewFindings={() => desk.setView("findings")}
+        />
+      </SectionCard>
+    </div>
+  );
+}
+
+export function HumanView({ desk }: { desk: Desk }) {
+  const queue = desk.result?.humanQueue ?? [];
+  if (!desk.result) {
+    return (
+      <EmptyState
+        icon={Users}
+        title="No run yet"
+        sub="Run triage to build the human review queue. Low-confidence tickets and anything touching credits or refunds land here — never auto-resolved."
+        action={
+          <Button size="sm" disabled={!desk.canRun} onClick={desk.run}>
+            Run triage
+          </Button>
+        }
+      />
+    );
+  }
+  return (
+    <SectionCard
+      title={
+        <>
+          Human review queue <Badge variant="secondary">{queue.length}</Badge>
+        </>
+      }
+      sub="Low confidence or credits / refunds — do not auto-resolve"
+    >
+      {queue.length === 0 ? (
+        <InfoNote>No tickets required human review in this run.</InfoNote>
+      ) : (
+        <ul className="space-y-3">
+          {queue.map((h) => {
+            const tr = desk.result!.tickets.find((t) => t.id === h.id);
+            return (
+              <li key={h.id} className="rounded-lg border bg-amber-50/40 px-4 py-3 dark:bg-amber-950/20">
+                <div className="flex flex-wrap items-center gap-2">
+                  <TicketChip id={h.id} onClick={() => desk.openTicket(h.id)} />
+                  {tr && <Badge variant="outline">{tr.intent ?? "unknown intent"}</Badge>}
+                  {tr?.unsure && (
+                    <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">Tier 1 unsure</Badge>
+                  )}
+                  <span className="ml-auto text-xs text-muted-foreground">{h.reasons.join("; ")}</span>
+                </div>
+                {h.summary && (
+                  <p className="mt-1.5 text-xs italic text-muted-foreground">
+                    Summary (<ModelName>qwen3.8-flash</ModelName>): {h.summary}
+                  </p>
+                )}
+                <div className="mt-2">
+                  <Button size="sm" variant="outline" onClick={() => desk.openTicket(h.id)}>
+                    Open ticket
+                  </Button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </SectionCard>
+  );
+}
+
+export function PatternsView({ desk }: { desk: Desk }) {
+  const patterns = desk.result?.patterns ?? [];
+  if (!desk.result) {
+    return (
+      <EmptyState
+        icon={BarChart3}
+        title="No patterns yet"
+        sub="Run triage to cluster the synthetic batch into evidenced recurring patterns (3+ tickets per cluster)."
+        action={
+          <Button size="sm" disabled={!desk.canRun} onClick={desk.run}>
+            Run triage
+          </Button>
+        }
+      />
+    );
+  }
+  return (
+    <div className="space-y-5">
+      <SectionCard
+        title={
+          <>
+            Evidence &amp; patterns <Badge variant="secondary">{patterns.length}</Badge>
+          </>
+        }
+        sub="Observations in synthetic data — not verified network truth"
+        action={
+          <button
+            type="button"
+            onClick={() => desk.setView("findings")}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-violet-700 hover:underline dark:text-violet-300"
+          >
+            AI findings <ArrowRight className="size-3.5" />
+          </button>
+        }
+      >
+        {patterns.length === 0 ? (
+          <InfoNote>No cluster reached the 3-ticket threshold.</InfoNote>
+        ) : (
+          <div className="space-y-4">
+            {patterns.map((p) => (
+              <article key={p.key} className="rounded-lg border px-4 py-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-sm font-semibold">{p.title}</h3>
+                  <Badge variant="secondary">{p.count} tickets</Badge>
+                  <Badge variant="outline">{p.distinctCustomers} customers</Badge>
+                  <Badge variant="outline">min conf {Math.round(p.confidenceMin * 100)}%</Badge>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    avg confidence {Math.round(p.confidenceAvg * 100)}% · intent {p.intent}
+                  </span>
+                </div>
+                <ul className="mt-2 space-y-1.5">
+                  {p.evidence.map((e) => (
+                    <li key={e.ticketId} className="text-sm">
+                      <TicketChip id={e.ticketId} onClick={() => desk.openTicket(e.ticketId)} />
+                      <span className="ml-2 italic">“{e.line}”</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 font-mono text-xs text-muted-foreground">{p.ticketIds.join(", ")}</p>
+                <p className="mt-1 text-xs italic text-muted-foreground">{p.note}</p>
+              </article>
+            ))}
+          </div>
+        )}
+      </SectionCard>
+    </div>
+  );
+}
+
+export function FindingsView({ desk }: { desk: Desk }) {
+  const analyses = desk.result?.analyses ?? [];
+  if (!desk.result) {
+    return (
+      <EmptyState
+        icon={Sparkles}
+        title="No AI findings yet"
+        sub="Run triage; Max analyses only clusters that warrant it (high-volume, or containing unsure/candidate tickets)."
+        action={
+          <Button size="sm" disabled={!desk.canRun} onClick={desk.run}>
+            Run triage
+          </Button>
+        }
+      />
+    );
+  }
+  return (
+    <div className="space-y-5">
+      <SectionCard
+        title={
+          <>
+            AI findings <Badge variant="secondary">{analyses.length}</Badge>
+          </>
+        }
+        sub="Cross-ticket cluster analysis, warranted clusters only"
+        action={
+          <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">model-generated</Badge>
+        }
+      >
+        {analyses.length === 0 ? (
+          <InfoNote>No cluster warranted a Max analysis in this run.</InfoNote>
+        ) : (
+          <div className="space-y-4">
+            {analyses.map((a) => (
+              <article key={a.key} className="rounded-lg border bg-violet-50/40 px-4 py-3 dark:bg-violet-950/20">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-sm font-semibold">{a.title}</h3>
+                  <Badge variant="outline">{a.count} tickets</Badge>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    Model-generated (<ModelName>{a.model}</ModelName>) — verify before acting
+                  </span>
+                </div>
+                <p className="mt-2 text-sm">{a.summary}</p>
+                {a.likelyCause && (
+                  <p className="mt-1 text-sm">
+                    <span className="font-medium">Likely cause:</span> {a.likelyCause}
+                  </p>
+                )}
+                {a.nextStep && (
+                  <p className="mt-1 text-sm">
+                    <span className="font-medium">Next step:</span> {a.nextStep}
+                  </p>
+                )}
+                {a.caveats && <p className="mt-1 text-xs italic text-muted-foreground">{a.caveats}</p>}
+                <p className="mt-2 flex flex-wrap gap-1.5">
+                  {a.ticketIds.map((id) => (
+                    <TicketChip key={id} id={id} onClick={() => desk.openTicket(id)} />
+                  ))}
+                </p>
+              </article>
+            ))}
+          </div>
+        )}
+      </SectionCard>
+    </div>
+  );
+}
+
+export function BriefView({ desk }: { desk: Desk }) {
+  if (!desk.result) {
+    return (
+      <EmptyState
+        icon={FileText}
+        title="No draft yet"
+        sub="The escalation brief is assembled deterministically from evidence after a triage run."
+        action={
+          <Button size="sm" disabled={!desk.canRun} onClick={desk.run}>
+            Run triage
+          </Button>
+        }
+      />
+    );
+  }
+  return (
+    <SectionCard
+      title="Draft escalation brief"
+      sub="Assembled deterministically from evidence — review before sending"
+      action={
+        <Button size="sm" variant="outline" onClick={desk.copyBrief}>
+          {desk.copied ? <Check /> : <Copy />} {desk.copied ? "Copied" : "Copy brief"}
+        </Button>
+      }
+    >
+      <pre className="scrollbar-thin max-h-[52vh] overflow-y-auto whitespace-pre-wrap rounded-lg border bg-muted/60 p-4 font-mono text-xs leading-relaxed">
+        {desk.result.brief}
+      </pre>
+      {desk.extras.length > 0 && (
+        <div className="mt-3 space-y-1.5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Marked for brief review · session only
+          </p>
+          {desk.extras.map((e) => (
+            <p key={e.ticketId} className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-1.5 text-xs">
+              <span className="flex-1">{e.line}</span>
+              <button
+                type="button"
+                aria-label={`Remove mark for ${e.ticketId}`}
+                onClick={() => desk.removeBrief(e.ticketId)}
+                className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-red-600"
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            </p>
+          ))}
+        </div>
+      )}
+      <div className="mt-3">
+        <InfoNote>
+          Verify all findings before sending. Tier 2 sections are model-generated. Marks above are a local review aid
+          only — they never change the draft, are not copied, and are never sent.
+        </InfoNote>
+      </div>
+    </SectionCard>
+  );
+}
+
+export function CostView({ desk }: { desk: Desk }) {
+  return (
+    <div className="space-y-5">
+      <SectionCard title="Cost analytics" sub="Routed cost vs an all-flagship baseline · every figure an estimate">
+        <div className="space-y-4">
+          <InfoNote>
+            Compare routing strategies: in Settings, point all three tiers at the same flagship model and run triage;
+            then switch back to a tiered mix (cheap classifier + light summaries + flagship only where warranted) and
+            run again. Each run below is priced with the models it actually used, so the difference between the two
+            routed estimates is what tiering saves.
+          </InfoNote>
+          <ModelCost stats={desk.result?.stats ?? null} models={desk.result?.models} />
+        </div>
+      </SectionCard>
+      <SectionCard title="Cost per run" sub="Runs made in this browser tab, not persisted, priced at their own models' assumed rates">
+        {desk.runs.length === 0 ? (
+          <InfoNote>No runs yet in this session. Run triage to record cost figures.</InfoNote>
+        ) : (
+          <div className="scrollbar-thin overflow-x-auto rounded-lg border">
+            <table className="w-full min-w-160 text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50 text-left text-xs text-muted-foreground">
+                  <th className="px-3 py-2 font-medium">Run</th>
+                  <th className="px-3 py-2 font-medium">Models (T1 / light / heavy)</th>
+                  <th className="px-3 py-2 font-medium">Routed est.</th>
+                  <th className="px-3 py-2 font-medium">All-flagship baseline</th>
+                  <th className="px-3 py-2 font-medium">Saved</th>
+                </tr>
+              </thead>
+              <tbody>
+                {desk.runs.map((r) => {
+                  const c = computeCost(r.stats, ratesForModels(r.models));
+                  return (
+                    <tr key={r.id} className="border-b last:border-0">
+                      <td className="px-3 py-2 font-mono text-xs">
+                        {r.id.slice(0, 8)} · {new Date(r.at).toLocaleTimeString()}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground">
+                        {r.models.decision} / {r.models.flash} / {r.models.max}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-xs">{usd(c.routed)}</td>
+                      <td className="px-3 py-2 font-mono text-xs">{usd(c.baseline)}</td>
+                      <td className="px-3 py-2 font-mono text-xs font-semibold text-teal-700 dark:text-teal-300">
+                        {c.savingsPct != null ? `${c.savingsPct.toFixed(0)}%` : "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SectionCard>
+    </div>
+  );
+}
+
+export function HistoryView({ desk }: { desk: Desk }) {
+  return (
+    <SectionCard
+      title={
+        <>
+          Run history <Badge variant="secondary">{desk.runs.length}</Badge>
+        </>
+      }
+      sub="Runs made in this browser tab, not persisted · full request/response logs also live in logs/ (local) or Pages console"
+    >
+      {desk.runs.length === 0 ? (
+        <EmptyState
+          icon={History}
+          title="No runs in this session"
+          sub="Each triage run records per-ticket Tier 1/Tier 2 requests and responses. Run triage to start the history."
+          action={
+            <Button size="sm" disabled={!desk.canRun} onClick={desk.run}>
+              Run triage
+            </Button>
+          }
+        />
+      ) : (
+        <ul className="space-y-3">
+          {desk.runs.map((r) => {
+            const c = computeCost(r.stats, ratesForModels(r.models));
+            return (
+              <li key={r.id} className="flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3">
+                <span className="flex size-9 items-center justify-center rounded-lg bg-teal-100 text-teal-700 dark:bg-teal-900/60 dark:text-teal-300">
+                  <History className="size-4" />
+                </span>
+                <div className="min-w-40 flex-1">
+                  <p className="font-mono text-xs font-semibold">{r.id.slice(0, 8)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(r.at).toLocaleString()} · {r.stats.tickets} tickets · {r.stats.tier1Calls} Tier 1 ·{" "}
+                    {r.stats.tier2.light.calls} flash · {r.stats.tier2.heavy.calls} Max
+                  </p>
+                  <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
+                    {r.models.decision} → {r.models.flash} / {r.models.max}
+                    {r.decisionEngine === "chat" ? " · chat classifier" : ""}
+                  </p>
+                </div>
+                <Badge variant={r.mode === "live" ? "secondary" : "outline"}>{r.mode}</Badge>
+                <Badge
+                  variant="outline"
+                  title={
+                    r.mode === "fixture"
+                      ? "Simulated responses — no API key used"
+                      : r.keySource === "session"
+                        ? "Reviewer-supplied session key (memory only)"
+                        : "Server environment key"
+                  }
+                >
+                  {r.mode === "fixture" ? "no key" : r.keySource === "session" ? "session key" : "server key"}
+                </Badge>
+                <span className="font-mono text-xs text-muted-foreground">
+                  {usd(c.routed)} est. · {c.savingsPct != null ? `${c.savingsPct.toFixed(0)}% saved` : "—"}
+                </span>
+                <Button size="sm" variant="outline" onClick={() => desk.openLog(r.id)}>
+                  <FileText /> View trace
+                </Button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </SectionCard>
+  );
+}
+
+export function SettingsView({ desk }: { desk: Desk }) {
+  const themes = [
+    { id: "system", label: "System", icon: Monitor },
+    { id: "light", label: "Light", icon: Sun },
+    { id: "dark", label: "Dark", icon: Moon },
+  ];
+  return (
+    <div className="space-y-5">
+      <ByoAccess desk={desk} />
+      <div className="grid items-start gap-5 lg:grid-cols-2">
+      <SectionCard title="Appearance" sub="Theme preference is stored in this browser">
+        <div className="flex gap-2">
+          {themes.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => desk.setTheme(t.id)}
+              className={`flex flex-1 flex-col items-center gap-1.5 rounded-lg border px-3 py-3 text-xs font-medium transition-colors ${
+                desk.theme === t.id
+                  ? "border-teal-600 bg-teal-50 text-teal-700 dark:bg-teal-950/50 dark:text-teal-300"
+                  : "hover:bg-muted"
+              }`}
+            >
+              <t.icon className="size-4" />
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Workspace" sub="Demo workspace · synthetic data only">
+        <dl className="space-y-2 text-sm">
+          <div className="flex justify-between gap-3">
+            <dt className="text-muted-foreground">Telco</dt>
+            <dd className="font-medium">ZephyrTel (fictional)</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-muted-foreground">Batch</dt>
+            <dd className="font-medium">{desk.batch?.batchLabel ?? "Loading…"}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-muted-foreground">Service mode</dt>
+            <dd className="font-medium">
+              {desk.health
+                ? desk.health.mode === "fixture"
+                  ? "fixture · simulated responses"
+                  : desk.health.configured
+                    ? "live · server key"
+                    : "live · session keys only"
+                : "Connecting…"}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-muted-foreground">Tickets</dt>
+            <dd className="font-mono">{desk.batch?.tickets.length ?? 0}</dd>
+          </div>
+        </dl>
+      </SectionCard>
+
+      <SectionCard title="Routing policy" sub="Deterministic rules applied after the Tier 1 classifier">
+        <ul className="space-y-2 text-sm">
+          <li className="flex gap-2">
+            <ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-600" />
+            Confidence below 70% → human review, flagged unsure.
+          </li>
+          <li className="flex gap-2">
+            <ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-600" />
+            Credits / refunds → human review regardless of confidence.
+          </li>
+          <li className="flex gap-2">
+            <Sparkles className="mt-0.5 size-4 shrink-0 text-violet-600" />
+            Complex with no deterministic answer → Tier 2 candidate; Max analysis only for warranted clusters (4+
+            tickets, or 2+ with unsure/candidate members), max 4 analyses per run.
+          </li>
+          <li className="flex gap-2">
+            <Inbox className="mt-0.5 size-4 shrink-0 text-teal-600" />
+            Everything else → direct code lane, zero model tokens.
+          </li>
+        </ul>
+      </SectionCard>
+
+      <SectionCard title="Data safety" sub="What this demo never touches">
+        <ul className="space-y-2 text-sm">
+          <li>All tickets, customers, plans and outages are synthetic, generated from scratch.</li>
+          <li>API key and endpoint hostname are read server-side only; never in client code, repo or logs.</li>
+          <li>No real provider names, logos, customer data or employer systems.</li>
+          <li>Run logs record request/response bodies but never keys, headers or the hostname.</li>
+        </ul>
+        <div className="mt-3">
+          <InfoNote>
+            Tier 1 input tokens this session:{" "}
+            {desk.runs.reduce((n, r) => n + r.stats.inputTokens, 0).toLocaleString("en-US")} across {desk.runs.length}{" "}
+            run(s).
+          </InfoNote>
+        </div>
+      </SectionCard>
+      </div>
+    </div>
+  );
+}
+
+const idleTests = (): Record<TierId, TestState> => ({
+  decision: idleTest(),
+  flash: idleTest(),
+  max: idleTest(),
+});
+
+function SecretInput({
+  value,
+  onChange,
+  placeholder,
+  shown,
+  onToggle,
+  ariaLabel,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  shown: boolean;
+  onToggle: () => void;
+  ariaLabel: string;
+}) {
+  return (
+    <span className="relative block flex-1">
+      <input
+        type={shown ? "text" : "password"}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        aria-label={ariaLabel}
+        autoComplete="off"
+        spellCheck={false}
+        className="w-full rounded-lg border bg-background py-1.5 pl-2.5 pr-8 font-mono text-xs outline-none transition-colors focus:border-teal-500 focus:ring-2 focus:ring-teal-500/25"
+      />
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-label={shown ? "Hide value" : "Show value"}
+        className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+      >
+        {shown ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+      </button>
+    </span>
+  );
+}
+
+function ByoAccess({ desk }: { desk: Desk }) {
+  const [shown, setShown] = useState<Record<string, boolean>>({});
+  const [custom, setCustom] = useState<Record<TierId, boolean>>({ decision: false, flash: false, max: false });
+  const [applied, setApplied] = useState(false);
+  const tests = desk.tierStatus;
+  const setTest = (id: TierId, s: TestState) => desk.setTierStatus(id, s);
+  const applyVerified = () => {
+    desk.setCreds({
+      ...desk.creds,
+      decisionEngine: "systemone",
+      tiers: {
+        decision: { ...desk.creds.tiers.decision, model: "decision-model-preview" },
+        flash: { ...desk.creds.tiers.flash, model: "qwen3.8-flash" },
+        max: { ...desk.creds.tiers.max, model: "qwen3.8-max" },
+      },
+    });
+    setCustom({ decision: false, flash: false, max: false });
+    TIERS.forEach((t) => desk.setTierStatus(t.id, idleTest()));
+    setApplied(true);
+    setTimeout(() => setApplied(false), 2000);
+  };
+  const toggle = (k: string) => setShown((s) => ({ ...s, [k]: !s[k] }));
+  const setShared = (patch: Partial<Pick<SessionCreds, "key" | "baseUrl">>) => desk.setCreds({ ...desk.creds, ...patch });
+  const setTier = (id: TierId, patch: Partial<TierEntry>) => {
+    desk.setCreds({ ...desk.creds, tiers: { ...desk.creds.tiers, [id]: { ...desk.creds.tiers[id], ...patch } } });
+    setTest(id, idleTest());
+  };
+  const pickClassifier = (v: string) => {
+    const decision = desk.creds.tiers.decision;
+    if (v === "__none") {
+      setCustom((c) => ({ ...c, decision: false }));
+      desk.setCreds({ ...desk.creds, tiers: { ...desk.creds.tiers, decision: { ...decision, model: "" } } });
+    } else if (v.startsWith("systemone")) {
+      setCustom((c) => ({ ...c, decision: false }));
+      desk.setCreds({
+        ...desk.creds,
+        decisionEngine: "systemone",
+        tiers: {
+          ...desk.creds.tiers,
+          decision: { ...decision, model: v.includes(":") ? v.slice("systemone:".length) : "decision-model-preview" },
+        },
+      });
+    } else if (v === "__custom") {
+      setCustom((c) => ({ ...c, decision: true }));
+      desk.setCreds({ ...desk.creds, decisionEngine: "chat", tiers: { ...desk.creds.tiers, decision: { ...decision, model: "" } } });
+    } else {
+      setCustom((c) => ({ ...c, decision: false }));
+      desk.setCreds({
+        ...desk.creds,
+        decisionEngine: "chat",
+        tiers: { ...desk.creds.tiers, decision: { ...decision, model: v.slice(5) } },
+      });
+    }
+    setTest("decision", idleTest());
+  };
+  const pickTier = (id: TierId, v: string) => {
+    if (v === "__none") {
+      setCustom((c) => ({ ...c, [id]: false }));
+      setTier(id, { model: "" });
+    } else if (v === "__custom") {
+      setCustom((c) => ({ ...c, [id]: true }));
+      setTier(id, { model: "" });
+    } else {
+      setCustom((c) => ({ ...c, [id]: false }));
+      setTier(id, { model: v });
+    }
+  };
+  const modelOptions = (list: CatalogModel[]) =>
+    families(list).map((f) => (
+      <optgroup key={f} label={f === "Qwen" ? "Qwen · recommended (verified end-to-end)" : f}>
+        {list
+          .filter((m) => m.family === f)
+          .map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.id} · {m.role}
+              {m.recommended ? " · recommended" : ""}
+            </option>
+          ))}
+      </optgroup>
+    ));
+  const classifierValue = custom.decision
+    ? "__custom"
+    : desk.creds.tiers.decision.model.trim() === ""
+      ? "__none"
+      : desk.creds.decisionEngine === "systemone"
+        ? `systemone:${desk.creds.tiers.decision.model.trim()}`
+        : `chat:${desk.creds.tiers.decision.model.trim()}`;
+  const test = async (id: TierId) => {
+    const e = effective(desk.creds, id);
+    if (!e.key || !e.baseUrl) {
+      setTest(id, { state: "error", message: "Enter a key and an HTTPS endpoint first (shared or per-tier)." });
+      return;
+    }
+    setTest(id, { state: "testing", message: "" });
+    try {
+      const r = await postJson<{ ok: boolean; models?: number | null; error?: string; message?: string }>(
+        "/api/credentials",
+        { tier: id, key: e.key, baseUrl: e.baseUrl },
+      );
+      setTest(
+        id,
+        r.ok
+          ? {
+              state: "ok",
+              message:
+                r.models != null
+                  ? `Access confirmed · ${r.models} models visible on this endpoint`
+                  : "Access confirmed · key accepted by endpoint",
+            }
+          : { state: "error", message: r.message ?? r.error ?? "Rejected by endpoint." },
+      );
+    } catch (err) {
+      setTest(id, { state: "error", message: err instanceof Error ? err.message : "Test failed." });
+    }
+  };
+  const active = sessionActive(desk.creds);
+  return (
+    <SectionCard
+      title={
+        <>
+          Bring your own API access <Badge variant="outline">session only</Badge>
+        </>
+      }
+      sub="Your own key per tier model — this build holds no server-side key, so nothing is ever billed to the site owner"
+      action={
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!active}
+          onClick={() => {
+            desk.setCreds(emptyCreds());
+            TIERS.forEach((t) => desk.setTierStatus(t.id, idleTest()));
+          }}
+        >
+          <Trash2 /> Clear session keys
+        </Button>
+      }
+    >
+      <div className="space-y-4">
+        <div className="flex items-start gap-2.5 rounded-lg border border-amber-300/80 bg-amber-50/80 px-3.5 py-3 dark:border-amber-800/60 dark:bg-amber-950/30">
+          <FlaskConical className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-300" />
+          <div className="flex-1 text-xs text-amber-900 dark:text-amber-100">
+            <p className="text-[11px] font-semibold uppercase tracking-wide">Reviewer testing disclaimer</p>
+            <p className="mt-1">
+              The full end-to-end workflow — classify, route, escalate, brief and cost readout — has only been tested
+              with the Qwen family: <ModelName>decision-model-preview</ModelName> (Tier 1),{" "}
+              <ModelName>qwen3.8-flash</ModelName> (Tier 2 light) and <ModelName>qwen3.8-max</ModelName> (Tier 2 heavy).
+              Other providers and models share the same OpenAI-compatible contract but are not end-to-end verified:
+              response shapes, confidence calibration and assumed rates may differ. Use the per-tier Test button and
+              check the run trace before relying on results.
+            </p>
+            <div className="mt-2.5 rounded-md border border-amber-300/60 bg-background/70 px-3 py-2.5 dark:border-amber-800/50 dark:bg-background/40">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-teal-700 dark:text-teal-300">
+                Recommended setup · 100% verified workflow
+              </p>
+              <ul className="mt-1.5 space-y-1 text-foreground/90 dark:text-foreground/90">
+                <li>
+                  <span className="font-medium">Tier 1 classifier:</span> <ModelName>decision-model-preview</ModelName>{" "}
+                  · decision contract (/systemone), calibrated probabilities
+                </li>
+                <li>
+                  <span className="font-medium">Tier 2 light:</span> <ModelName>qwen3.8-flash</ModelName> ·
+                  chat/completions
+                </li>
+                <li>
+                  <span className="font-medium">Tier 2 heavy:</span> <ModelName>qwen3.8-max</ModelName> ·
+                  chat/completions
+                </li>
+                <li>
+                  <span className="font-medium">Endpoint:</span> an Alibaba MaaS (Qwen) OpenAI-compatible base URL
+                  ending in <span className="font-mono">/compatible-mode/v1</span>; one shared API key covers all three
+                  tiers.
+                </li>
+              </ul>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={applyVerified}
+                  className="border-teal-600 text-teal-700 hover:bg-teal-50 dark:border-teal-700 dark:text-teal-300 dark:hover:bg-teal-950/40"
+                >
+                  {applied ? <Check /> : <BadgeCheck />} {applied ? "Verified setup applied" : "Apply verified model setup"}
+                </Button>
+                <span className="text-[11px] text-muted-foreground">
+                  Sets the three model selections only — your key and endpoint stay yours to enter.
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <InfoNote tone="amber">
+          Keys and endpoints live in this page's memory only: a refresh clears them and you must enter them again.
+          There is no database in this build, so reloading also resets the desk itself — the last run, findings, brief
+          and history disappear and triage has to be run again. Credentials are sent to this site's server over HTTPS
+          solely for your run — never stored, never logged, never written to disk or browser storage.
+        </InfoNote>
+        <InfoNote>
+          Provider-agnostic: any OpenAI-compatible endpoint works — Qwen MaaS, DeepSeek, OpenAI, Anthropic
+          (OpenAI-compat layer), Moonshot/Kimi and others. Dropdowns list popular demo models only; choose Custom for
+          anything else. The classifier choice never changes the Tier 2 selections, so you can price an all-flagship
+          run against a tiered run in Cost analytics.
+        </InfoNote>
+        <div className="grid gap-3 lg:grid-cols-2">
+          <label className="block">
+            <span className="text-xs font-medium text-muted-foreground">Shared base URL (all tiers)</span>
+            <input
+              value={desk.creds.baseUrl}
+              onChange={(e) => setShared({ baseUrl: e.target.value })}
+              placeholder="https://your-maas-host/compatible-mode/v1"
+              autoComplete="off"
+              spellCheck={false}
+              className="mt-1 w-full rounded-lg border bg-background px-2.5 py-1.5 font-mono text-xs outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/25"
+            />
+          </label>
+          <div>
+            <span className="text-xs font-medium text-muted-foreground">Shared API key (all tiers)</span>
+            <span className="mt-1 flex">
+              <SecretInput
+                value={desk.creds.key}
+                onChange={(v) => setShared({ key: v })}
+                placeholder="Your API key"
+                shown={!!shown.shared}
+                onToggle={() => toggle("shared")}
+                ariaLabel="Shared API key"
+              />
+            </span>
+          </div>
+        </div>
+        <div className="space-y-3">
+          {TIERS.map((t) => {
+            const e = effective(desk.creds, t.id);
+            const ts = tests[t.id];
+            return (
+              <div key={t.id} className="rounded-lg border px-3.5 py-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <KeyRound className="size-3.5 text-muted-foreground" />
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t.label}</span>
+                  {effectiveModel(desk.creds, t.id) ? (
+                    <ModelName>{effectiveModel(desk.creds, t.id)}</ModelName>
+                  ) : (
+                    <span className="text-xs italic text-muted-foreground">no selection</span>
+                  )}
+                  {isRecommended(effectiveModel(desk.creds, t.id)) && (
+                    <span className="rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-medium text-teal-700 dark:bg-teal-950/60 dark:text-teal-300">
+                      recommended
+                    </span>
+                  )}
+                  <span
+                    className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                      e.key
+                        ? "bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {e.key ? "key set" : "no key"}
+                  </span>
+                </div>
+                <div className="mt-2">
+                  {t.id === "decision" ? (
+                    <select
+                      value={classifierValue}
+                      onChange={(e) => pickClassifier(e.target.value)}
+                      aria-label="Classifier type and model"
+                      className="w-full rounded-lg border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-teal-500"
+                    >
+                      <option value="__none">No selection — choose a model</option>
+                      <optgroup label="Decision contract · /systemone">
+                        {DECISION_CONTRACT_OPTIONS.map((m) => (
+                          <option key={m.id} value={`systemone:${m.id}`}>
+                            {m.name ? `${m.name} · ` : ""}
+                            {m.id} · calibrated probabilities
+                            {m.recommended ? " · recommended" : ""}
+                          </option>
+                        ))}
+                      </optgroup>
+                      {families(CLASSIFIER_CHAT_OPTIONS).map((f) => (
+                        <optgroup
+                          key={f}
+                          label={f === "Qwen" ? "Chat classifier · Qwen (recommended)" : `Chat classifier · ${f}`}
+                        >
+                          {CLASSIFIER_CHAT_OPTIONS.filter((m) => m.family === f).map((m) => (
+                            <option key={m.id} value={`chat:${m.id}`}>
+                              {m.id} · {m.role}
+                              {m.recommended ? " · recommended" : ""}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                      <option value="__custom">Custom chat model ID…</option>
+                    </select>
+                  ) : (
+                    <select
+                      value={custom[t.id] ? "__custom" : desk.creds.tiers[t.id].model.trim() || "__none"}
+                      onChange={(e) => pickTier(t.id, e.target.value)}
+                      aria-label={`${t.label} model`}
+                      className="w-full rounded-lg border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-teal-500"
+                    >
+                      <option value="__none">No selection — choose a model</option>
+                      {modelOptions(t.id === "flash" ? LIGHT_OPTIONS : HEAVY_OPTIONS)}
+                      <option value="__custom">Custom model ID…</option>
+                    </select>
+                  )}
+                  {custom[t.id] && (
+                    <input
+                      value={desk.creds.tiers[t.id].model}
+                      onChange={(e) => setTier(t.id, { model: e.target.value })}
+                      placeholder="Custom model ID exactly as your endpoint names it"
+                      autoComplete="off"
+                      spellCheck={false}
+                      aria-label={`${t.label} custom model ID`}
+                      className="mt-2 w-full rounded-lg border bg-background px-2.5 py-1.5 font-mono text-xs outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/25"
+                    />
+                  )}
+                </div>
+                <div className="mt-2 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                  <SecretInput
+                    value={desk.creds.tiers[t.id].key}
+                    onChange={(v) => setTier(t.id, { key: v })}
+                    placeholder="Per-tier key (else shared key)"
+                    shown={!!shown[t.id]}
+                    onToggle={() => toggle(t.id)}
+                    ariaLabel={`${t.model} API key`}
+                  />
+                  <input
+                    value={desk.creds.tiers[t.id].baseUrl}
+                    onChange={(e) => setTier(t.id, { baseUrl: e.target.value })}
+                    placeholder="Per-tier URL (else shared URL)"
+                    autoComplete="off"
+                    spellCheck={false}
+                    aria-label={`${t.model} base URL`}
+                    className="w-full rounded-lg border bg-background px-2.5 py-1.5 font-mono text-xs outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/25"
+                  />
+                  <Button size="sm" variant="outline" disabled={ts.state === "testing"} onClick={() => test(t.id)}>
+                    {ts.state === "testing" ? <Loader2 className="animate-spin" /> : <Check />} Test
+                  </Button>
+                </div>
+                {ts.state === "ok" && (
+                  <p
+                    title="The endpoint accepted your key and returned its model list. It does not prove the selected model answers chat calls — run triage and check the run trace for that."
+                    className="mt-1.5 cursor-help text-xs text-teal-700 underline decoration-dotted decoration-teal-600/40 underline-offset-2 dark:text-teal-300"
+                  >
+                    {ts.message}
+                  </p>
+                )}
+                {ts.state === "error" && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{ts.message}</p>}
+              </div>
+            );
+          })}
+        </div>
+        {desk.creds.decisionEngine === "chat" && (
+          <InfoNote tone="amber">
+            Classifier runs on the chat contract, so the flagship (or any chat model) can classify. Confidence is
+            self-reported by the model — no calibrated probabilities — and the 70% unsure floor plus refund rules
+            still apply.
+          </InfoNote>
+        )}
+        <InfoNote>
+          {active
+            ? decisionReady(desk.creds)
+              ? "Session access detected — runs use only your keys, never a server-side secret. Every tier still needs a key, an HTTPS endpoint and a chosen model, each Test-confirmed, before Run triage proceeds."
+              : "Session key detected, but the Tier 1 classifier key and HTTPS endpoint are incomplete — triage stays blocked until they are set."
+            : "No session key set. This deployment has no server-side key of its own, so real runs need your own access here. Keys stay in memory and are cleared on refresh."}
+        </InfoNote>
+      </div>
+    </SectionCard>
+  );
+}

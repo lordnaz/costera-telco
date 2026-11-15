@@ -1,12 +1,13 @@
 // DEV-ONLY local Function server (Node, no Deno required) with the fixture classifier.
 // Vite proxies /functions/v1/app here. Never deployed; lives outside dist/ and functions/.
+// Reads no environment variables: fixtures need no credentials.
 import { createServer } from "node:http";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { createHandler } from "../server/handler.ts";
 import { fixtureClassify } from "./fixtures.ts";
 import { fixtureAnalyze, fixtureSummarize } from "./fixtures-tier2.ts";
 
-const env = (name) => process.env[name];
+const env = () => undefined;
 const sink = (record) => {
   mkdirSync("logs", { recursive: true });
   const file = `logs/triage-${record.at.replace(/[:.]/g, "-")}-${record.runId.slice(0, 8)}.json`;

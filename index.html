@@ -8,6 +8,17 @@
       content="Triage desk for support agents at a fictional telco. Turns scattered synthetic tickets into evidenced patterns and a draft escalation brief, routing each step to the cheapest model that can do it."
     />
     <title>Triage Desk — ZephyrTel (fictional)</title>
+    <script>
+      // Resolve the theme (explicit choice, else OS preference) before first paint so
+      // CSS variables and dark-mode utilities always agree.
+      try {
+        var t = localStorage.getItem("costera.theme") || "system";
+        var dark = t === "dark" || (t === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+      } catch (e) {
+        /* storage unavailable — fall back to the media query in globals.css */
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

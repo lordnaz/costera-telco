@@ -1,12 +1,13 @@
-// DEV-ONLY live local server: real Tier 1 classifier, secrets from process.env.
-// Run: node --env-file=.env dev/node-live-local.mjs
-// Create .env yourself from .env.example; never commit it, never paste values in chat.
-// Stop the fixture server (dev/node-function-local.mjs) first — both use port 8000.
+// DEV-ONLY live local server: real Tier 1/2 clients, session credentials only.
+// This server reads NO environment variables — there is no owner key here.
+// Enter the API key, endpoint and model choices in the app's Settings page; they live in
+// memory for one browser session and are sent per request. Stop the fixture server
+// (dev/node-function-local.mjs) first — both use port 8000.
 import { createServer } from "node:http";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { createHandler } from "../server/handler.ts";
 
-const env = (name) => process.env[name];
+const env = () => undefined;
 const sink = (record) => {
   mkdirSync("logs", { recursive: true });
   const file = `logs/triage-${record.at.replace(/[:.]/g, "-")}-${record.runId.slice(0, 8)}.json`;
@@ -44,5 +45,5 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(8000, "127.0.0.1", () => {
-  console.log("LIVE local Function server on http://127.0.0.1:8000 (secrets from .env)");
+  console.log("LIVE local Function server on http://127.0.0.1:8000 (no env secrets — configure access in Settings)");
 });

@@ -193,4 +193,142 @@ async function call(handler, path, method = "GET", body) {
   console.log("PASS M3 cost math (routed < baseline, savings in range, lane costs sum to routed)");
 }
 
+// 11. Session credentials: validation, SSRF guard, per-tier override, no env fallback
+{
+  const { createHandler } = await import("../server/handler.ts");
+  const {
+    parseSessionCredentials,
+    effectiveCredentials,
+    sessionActive,
+    assertPublicHttpsUrl,
+    CredentialsError,
+  } = await import("../server/credentials.ts");
+  const h = createHandler(() => undefined);
+  const post = (path, body) =>
+    h(new Request(`http://local/api/${path}`, { method: "POST", body: JSON.stringify(body) }));
+  let r = await post("triage", {});
+  assert.equal(r.status, 503);
+  r = await post("triage", { credentials: { key: "k", baseUrl: "http://127.0.0.1:8000/v1" } });
+  assert.equal(r.status, 400);
+  assert.equal((await r.json()).error, "invalid_credentials");
+  r = await post("credentials", { tier: "decision", key: "k", baseUrl: "https://169.254.169.254/latest/" });
+  assert.equal(r.status, 400);
+  r = await post("credentials", { tier: "nope", key: "k", baseUrl: "https://example.com/v1" });
+  assert.equal(r.status, 400);
+  const s = parseSessionCredentials({
+    key: "shared",
+    baseUrl: "https://example.com/v1",
+    tiers: { decision: { key: "d" } },
+  });
+  assert.ok(sessionActive(s));
+  const eff = effectiveCredentials(s, () => "owner-secret");
+  assert.equal(eff.tiers.decision.key, "d");
+  assert.equal(eff.tiers.flash.key, "shared");
+  assert.equal(eff.tiers.max.baseUrl, "https://example.com/v1");
+  const effEnv = effectiveCredentials(null, (n) => (n === "COSTERA_API_KEY" ? "owner" : "https://owner.example/v1"));
+  assert.equal(effEnv.tiers.decision.key, "owner");
+  assert.throws(() => assertPublicHttpsUrl("https://10.0.0.5/v1"), CredentialsError);
+  assert.throws(() => assertPublicHttpsUrl("https://localhost/v1"), CredentialsError);
+  assert.throws(() => assertPublicHttpsUrl("https://example.com:8443/v1"), CredentialsError);
+  console.log("PASS session credentials (validation, SSRF guard, per-tier override, no env fallback)");
+}
+
+// 12. Chat-engine classifier: flagship model can classify via /chat/completions
+{
+  const { createDecisionClassifier } = await import("../server/decision.ts");
+  const ticket = { id: "ZT-9001", createdAt: "2026-11-14T00:00:00Z", channel: "chat", customer: "cust_900", text: "My bill jumped after the plan change." };
+  const env = (n) =>
+    n === "COSTERA_API_KEY" ? "k"
+    : n === "COSTERA_API_BASE_URL" ? "https://example.com/v1"
+    : n === "COSTERA_DECISION_ENGINE" ? "chat"
+    : n === "COSTERA_MODEL" ? "qwen3.8-max"
+    : undefined;
+  const origFetch = globalThis.fetch;
+  let lastUrl = "";
+  globalThis.fetch = async (url) => {
+    lastUrl = String(url);
+    return new Response(
+      JSON.stringify({
+        id: "chat-1",
+        choices: [{ message: { content: '```json\n{"intent":{"choice":"billing","confidence":0.82},"complexity":{"choice":"routine","confidence":0.9}}\n```' } }],
+        usage: { prompt_tokens: 120, completion_tokens: 40 },
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+  };
+  try {
+    const classify = createDecisionClassifier(env);
+    const d = await classify(ticket);
+    assert.ok(lastUrl.endsWith("/chat/completions"));
+    assert.equal(d.fields.intent.choice, "billing");
+    assert.ok(Math.abs(d.fields.intent.confidence - 0.82) < 1e-9);
+    assert.equal(d.fields.complexity.choice, "routine");
+    assert.equal(d.inputTokens, 120);
+    assert.deepEqual(d.fields.intent.probabilities, {});
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ choices: [{ message: { content: "not json at all" } }] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    await assert.rejects(() => classify(ticket), (e) => e.code === "decision_contract_mismatch");
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ choices: [{ message: { content: '{"intent":{"choice":"nope","confidence":0.9},"complexity":{"choice":"routine","confidence":0.9}}' } }] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    await assert.rejects(() => classify(ticket), (e) => e.code === "decision_contract_mismatch");
+  } finally {
+    globalThis.fetch = origFetch;
+  }
+  console.log("PASS chat-engine classifier (flagship via chat/completions, strict parse, bad choice rejected)");
+}
+
+// 13. Per-model pricing: all-flagship vs tiered comparison
+{
+  const { computeCost, ratesForModels, DEFAULT_RATES } = await import("../src/cost.ts");
+  const stats = {
+    tickets: 22,
+    tier1Calls: 22,
+    inputTokens: 4688,
+    avgLatencyMs: 400,
+    lanes: { direct: 11 },
+    patterns: 2,
+    errors: 0,
+    tier2: {
+      light: { calls: 11, inputTokens: 1271, outputTokens: 2312, avgLatencyMs: 3000 },
+      heavy: { calls: 3, inputTokens: 1145, outputTokens: 2066, avgLatencyMs: 16000 },
+    },
+  };
+  const flagship = { decision: "gpt-6", flash: "gpt-6", max: "gpt-6" };
+  const tiered = { decision: "deepseek-chat", flash: "qwen3.8-flash", max: "gpt-6" };
+  const cf = computeCost(stats, ratesForModels(flagship));
+  const ct = computeCost(stats, ratesForModels(tiered));
+  assert.ok(Math.abs(cf.routed - cf.baseline) < 1e-9);
+  assert.ok(cf.savingsPct === null || Math.abs(cf.savingsPct) < 1e-9);
+  assert.ok(ct.routed < cf.routed);
+  assert.ok(ct.savingsPct > 0);
+  const custom = ratesForModels({ decision: "my-model", flash: "my-model", max: "my-model" });
+  assert.deepEqual(custom, DEFAULT_RATES);
+  console.log("PASS per-model pricing (all-flagship = baseline, tiered cheaper, custom fallback)");
+}
+
+// 14. JEFF classifier option: decision-contract only, excluded from Tier 2, priced
+{
+  const { MODELS, DECISION_CONTRACT_OPTIONS, LIGHT_OPTIONS, HEAVY_OPTIONS } = await import("../src/models.ts");
+  const { ratesForModels } = await import("../src/cost.ts");
+  const jeff = MODELS.find((m) => m.id === "jeff");
+  assert.ok(jeff && jeff.classifierOnly);
+  assert.equal(
+    MODELS.filter((m) => m.recommended).map((m) => m.id).join(","),
+    "decision-model-preview,qwen3.8-flash,qwen3.8-max",
+  );
+  assert.ok(DECISION_CONTRACT_OPTIONS.some((m) => m.id === "jeff"));
+  assert.ok(!LIGHT_OPTIONS.some((m) => m.id === "jeff"));
+  assert.ok(!HEAVY_OPTIONS.some((m) => m.id === "jeff"));
+  const r = ratesForModels({ decision: "jeff", flash: "qwen3.8-flash", max: "qwen3.8-max" });
+  assert.equal(r.decisionIn, 0.3);
+  assert.equal(r.decisionOut, 0.6);
+  console.log("PASS JEFF classifier option (decision-contract only, excluded from Tier 2, priced)");
+}
+
 console.log("ALL CHECKS PASSED");

@@ -81,9 +81,29 @@ export interface TriageStats {
   tier2: { light: Tier2Usage; heavy: Tier2Usage };
 }
 
+export interface TraceEntry {
+  stage: "tier1" | "tier2_light" | "tier2_heavy";
+  ticketId: string | null;
+  clusterKey: string | null;
+  at: string;
+  request: unknown;
+  response: unknown;
+  intent: string | null;
+  confidence: number | null;
+  lane: TicketResult["lane"] | null;
+  unsure: boolean;
+  reasons: string[];
+  inputTokens: number | null;
+  outputTokens: number | null;
+  latencyMs: number | null;
+}
+
 export interface TriageResult {
   ok: true;
   mode: "live" | "fixture";
+  keySource?: "env" | "session";
+  decisionEngine?: "systemone" | "chat";
+  models?: { decision: string; flash: string; max: string };
   telco: string;
   synthetic: true;
   batchLabel: string;
@@ -94,6 +114,7 @@ export interface TriageResult {
   humanQueue: { id: string; reasons: string[]; summary: string | null }[];
   brief: string;
   stats: TriageStats;
+  trace?: TraceEntry[];
 }
 
 export interface Health {

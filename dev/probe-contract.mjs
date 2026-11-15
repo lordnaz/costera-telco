@@ -3,13 +3,16 @@
 // each, stops at the first response carrying the verified `answers` shape. Then makes
 // one flash call to confirm the standard chat-completions shape for M2.
 // Logs status + shape only — never the API key, never the endpoint hostname.
-// Run: node --env-file=.env dev/probe-contract.mjs
+// The app never reads these from a file; this throwaway probe takes them as arguments:
+//   node dev/probe-contract.mjs <apiKey> <baseUrl>
+// Passing them on the command line puts them in your shell history, so run it from a
+// private shell, or export the two variables yourself for this one process instead.
 import { TICKETS } from "../server/data.ts";
 
-const key = process.env.COSTERA_API_KEY;
-const base = process.env.COSTERA_API_BASE_URL;
+const key = process.argv[2] ?? process.env.COSTERA_API_KEY;
+const base = process.argv[3] ?? process.env.COSTERA_API_BASE_URL;
 if (!key || !base) {
-  console.error("Missing values. Fill COSTERA_API_KEY in .env yourself first.");
+  console.error("Usage: node dev/probe-contract.mjs <apiKey> <baseUrl>");
   process.exit(1);
 }
 const href = base.endsWith("/") ? base : base + "/";

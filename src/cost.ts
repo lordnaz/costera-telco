@@ -1,6 +1,8 @@
 // M3 cost math. Rates are fixed ASSUMPTIONS (private MaaS endpoint has no public price list);
 // the UI labels every figure as an estimate, not billing truth.
 import type { TriageStats } from "./types";
+import { modelById } from "./models.ts";
+import type { RunModels } from "./models.ts";
 
 export interface Rates {
   decisionIn: number;
@@ -51,6 +53,27 @@ export interface LaneCosts {
   tier1: number;
   flash: number;
   max: number;
+}
+
+// Rates follow the models actually used in the run, so an all-flagship configuration
+// prices differently from a tiered one. Unknown/custom IDs fall back to role defaults.
+export function ratesForModels(models: RunModels | undefined, fallback: Rates = DEFAULT_RATES): Rates {
+  if (!models) return { ...fallback };
+  const pick = (id: string, roleIn: number, roleOut: number) => {
+    const m = modelById(id);
+    return m ? { in: m.in, out: m.out } : { in: roleIn, out: roleOut };
+  };
+  const d = pick(models.decision, fallback.decisionIn, fallback.decisionOut);
+  const f = pick(models.flash, fallback.flashIn, fallback.flashOut);
+  const x = pick(models.max, fallback.maxIn, fallback.maxOut);
+  return {
+    decisionIn: d.in,
+    decisionOut: d.out,
+    flashIn: f.in,
+    flashOut: f.out,
+    maxIn: x.in,
+    maxOut: x.out,
+  };
 }
 
 export function laneCosts(stats: TriageStats, rates: Rates): LaneCosts {

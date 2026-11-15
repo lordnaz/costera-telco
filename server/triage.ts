@@ -6,9 +6,9 @@
 
 import { ACCOUNTS, BATCH_LABEL, OUTAGES, PLANS, PROCEDURES, TELCO, TICKETS } from "./data.ts";
 import type { Ticket } from "./data.ts";
-import { DecisionError } from "./decision.ts";
+import { DECISION_MODEL, DecisionError } from "./decision.ts";
 import type { ClassifyFn, Decision } from "./decision.ts";
-import { MAX_MODEL } from "./tier2.ts";
+import { FLASH_MODEL, MAX_MODEL } from "./tier2.ts";
 import type { AnalyzeFn, ClusterInput, SummarizeFn } from "./tier2.ts";
 
 export const CONFIDENCE_FLOOR = 0.7;
@@ -110,6 +110,9 @@ export interface TriageStats {
 export interface TriageResult {
   ok: true;
   mode: "live" | "fixture";
+  keySource: "env" | "session";
+  decisionEngine: "systemone" | "chat";
+  models: { decision: string; flash: string; max: string };
   telco: string;
   synthetic: true;
   batchLabel: string;
@@ -540,6 +543,9 @@ export async function runTriage(
   const partial: Omit<TriageResult, "brief"> = {
     ok: true,
     mode,
+    keySource: "env",
+    decisionEngine: "systemone",
+    models: { decision: DECISION_MODEL, flash: FLASH_MODEL, max: MAX_MODEL },
     telco: `${TELCO} (fictional)`,
     synthetic: true,
     batchLabel: BATCH_LABEL,

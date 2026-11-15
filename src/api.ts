@@ -1,11 +1,13 @@
 const MESSAGES: Record<string, string> = {
   service_not_configured:
-    "The triage service is not configured yet. The site owner needs to enter the API secrets in Sites Settings.",
+    "No API access for this run. Open Settings and enter your own session API key, endpoint and model per tier.",
   upstream_unreachable: "The classification service could not be reached. Try again shortly.",
   upstream_error: "The classification service returned an error. Try again shortly.",
   decision_contract_mismatch: "The classification service returned an unexpected response shape.",
   triage_failed: "Triage could not complete. Try again.",
   invalid_body: "The request was rejected as invalid.",
+  invalid_credentials:
+    "The credentials were rejected as invalid. Use a public HTTPS endpoint (default port) and a non-empty key.",
   invalid_ticket_ids: "The request was rejected as invalid.",
   unknown_ticket_id: "The request referenced an unknown ticket.",
 };

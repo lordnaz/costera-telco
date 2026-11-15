@@ -37,26 +37,67 @@ labelled an estimate, not billing truth.
 
 ## Architecture
 
-![COSTERA high-level solution architecture (M1–M3)](docs/architecture.png)
+![COSTERA solution architecture — evidence-first telco triage with cost-aware model routing (M1–M3)](docs/architecture.png)
 
 - Static React 19 + TypeScript + Vite + Tailwind frontend (`src/`), built to `dist/`.
 - **Cloudflare Pages Functions** (`functions/api/[[path]].ts`) expose `/api/health`,
-  `/api/batch`, `/api/triage`. The runtime-agnostic triage core lives in `server/`.
-- API key and endpoint are read **server-side only** from encrypted Pages environment
-  variables. They never appear in client code, this repo, or logs.
+  `/api/batch`, `/api/triage`, `/api/credentials`. The runtime-agnostic triage core lives in `server/`.
+- **No server-side secrets anywhere.** Model access comes from the reviewer's own session
+  credentials entered in Settings; they are used server-side for that single request and never
+  appear in client code, this repo, browser storage or logs.
 - No database: synthetic tickets and knowledge base are flat TypeScript modules.
+
+> Diagram note: the "Server-side secrets" caption in the picture predates the move to reviewer
+> session keys. Nothing is read from server secrets any more — see Configuration below.
 
 ## Configuration
 
-| Name | Purpose |
-| --- | --- |
-| `COSTERA_API_KEY` | MaaS API key (server-side only) |
-| `COSTERA_API_BASE_URL` | OpenAI-compatible base URL incl. `/compatible-mode/v1/` (server-side only) |
+There is nothing to configure on the server. **Settings → "Bring your own API access"** is the
+only source of model credentials. One key and base URL can be shared across all three tiers, or
+overridden per tier, and each tier has its own connection **Test** button:
 
-- Deployed: set both as **encrypted environment variables** in Cloudflare Pages settings.
-  Without them the triage endpoint returns `service_not_configured` — it never fakes live results.
-- Local: `.env` (Node fixture server) or `.dev.vars` (wrangler). Both are gitignored;
-  copy `.env.example` and fill in values yourself. Never commit or paste real values.
+| Field | Purpose |
+| --- | --- |
+| API key | Your MaaS / provider key — memory-only, sent with each run, never stored or logged |
+| Base URL | OpenAI-compatible base URL incl. `/compatible-mode/v1/`, public HTTPS on the default port |
+| Model per tier | Tier 1 classifier, Tier 2 light, Tier 2 heavy (dropdown of popular models, or a custom ID) |
+
+- Without session credentials `/api/triage` returns `service_not_configured` — it never fakes
+  live results. The Functions entry point, the dev servers and the checks all pass an **empty**
+  environment reader, so no deployment of this app can spend anyone else's key or quota.
+- There is deliberately no `.env` / `.env.example` / `.dev.vars` step; earlier builds read owner
+  secrets that way and that path has been removed. `.gitignore` keeps the `.env*` rules purely as
+  defense in depth. Never commit or paste real values.
+
+Session values are **memory-only**: a refresh clears them and they must be re-entered. They are
+sent to this site's server over HTTPS solely for that run, never stored, never logged, never
+written to browser storage, and never used for a tier other than the one they belong to
+(per-tier overrides win outright, with no fallback to any other key). Session endpoints must be
+public HTTPS URLs on the default port (loopback/private/link-local hosts are rejected). Run logs
+record only `keySource` (`session` for reviewer keys, `env` only for a hypothetical
+server-secret deployment), never the key or hostname. **Run triage opens a setup checklist**
+until all three tiers are configured and Test-confirmed, guiding the reviewer to Settings;
+fixture mode (local development) is the only run that skips that step.
+
+Each tier also accepts a **model choice from a curated popular-model dropdown** (Qwen, DeepSeek,
+OpenAI, Anthropic, Moonshot/Kimi; plus a custom-ID escape hatch). Qwen groups list first and the
+verified Qwen trio is marked "recommended" in every dropdown and tier header. Tier 1 has a
+**classifier type dropdown**: the verified decision contract (`POST {base}/systemone`,
+`decision-model-preview` or `jeff` / JEFF where the endpoint exposes it) or any chat model as
+classifier via `POST {base}/chat/completions`. The classifier choice never applies to the Tier 2
+lists. The chat engine uses a strict JSON prompt; its confidence is
+self-reported (no calibrated probabilities), and the 70% unsure floor and refund rules still apply.
+
+Cost figures follow the **models actually used per run** (assumed per-model rates), so a reviewer
+can point all three tiers at one flagship model, run, then restore a tiered mix and run again:
+Cost analytics prices each run separately and the difference is what tiering saves.
+
+**Testing disclaimer:** the full end-to-end workflow has only been verified with the Qwen family
+(`decision-model-preview`, `qwen3.8-flash`, `qwen3.8-max`). Other providers and models are
+contract-compatible but untested end-to-end; the Settings page carries the same disclaimer plus
+the recommended 100%-verified setup (decision contract for Tier 1, flash/max for Tier 2, a Qwen
+MaaS OpenAI-compatible base URL ending in `/compatible-mode/v1`, one shared key) with a one-click
+"Apply verified model setup" button that sets the three model selections.
 
 The decision-model **response** parsing follows the verified shape (`answers.<field>.choice /
 .confidence / .probabilities`). The request contract is owner-verified: `POST {base}/systemone`
@@ -74,18 +115,26 @@ npm run dev                        # Vite on 127.0.0.1:5173, proxies /api
 Fixture mode simulates Tier 1 responses and is clearly labelled in the UI. The fixture
 classifier lives in `dev/` and is never deployed.
 
-Real Workers runtime check (needs `npm run build` first; secrets via `.dev.vars` if present):
+Real Workers runtime check (needs `npm run build` first; no secrets to supply):
 
 ```sh
 npm run dev:cf                     # wrangler pages dev on 127.0.0.1:8001
 ```
 
-Live local test against the real API (create `.env` yourself first; never commit it):
+Live local run against the real API — same code path as the deployment, no env files:
 
 ```sh
-node --env-file=.env dev/probe-contract.mjs    # one-off request-contract discovery
-node --env-file=.env dev/node-live-local.mjs   # real Tier 1 on :8000 (stop fixture server first)
+node dev/node-live-local.mjs       # real Tier 1/2 on :8000 (stop the fixture server first)
 ```
+
+The server reads **no** environment variables, so health reports no server key and every real
+call uses the credentials you type into Settings — exactly like the public site. Provider
+lock-in is likewise gone: any OpenAI-compatible endpoint and model ID works, with the Qwen trio
+as the verified default.
+
+`dev/probe-contract.mjs` is a throwaway request-contract probe, not part of the app; it takes its
+two values as arguments (`node dev/probe-contract.mjs <apiKey> <baseUrl>`) so nothing is read from
+a file. Command-line arguments land in your shell history, so use a private shell for it.
 
 Checks:
 
@@ -104,6 +153,30 @@ routing outcome. Logs never contain headers, the API key, or the endpoint hostna
 - Deployed Pages Functions emit one structured JSON line per run to the console
   (visible in Cloudflare Pages logs).
 - `POST /api/triage` with `{"includeTrace": true}` also returns the trace in the response.
+
+## State and persistence
+
+**No database, by design.** M1–M3 is a stateless demo: the ticket batch and knowledge base are
+flat TypeScript modules, nothing is written server-side except run logs, and there is no store
+for runs, patterns, briefs or marks. So **reloading the page resets the desk** — the last run,
+findings, escalation brief, brief marks, run history and cost readout all disappear, and the
+reviewer re-enters API access in Settings, Test-confirms each tier and runs triage again.
+
+Where each value lives:
+
+| Value | Location | Survives refresh |
+| --- | --- | --- |
+| Theme choice | `localStorage` (`costera.theme`) | Yes |
+| Session API keys, endpoints, model choices, brief marks | Page memory only | No — deliberately |
+| Run result, patterns, brief, history, cost figures | Page memory only | No |
+| Run logs (stats + per-ticket request/response trace) | `logs/*.json` locally; Pages console when deployed | Yes — the audit trail |
+
+Session credentials are never persisted anywhere by choice: keeping them out of storage is what
+makes "your key, your quota, one request at a time" true. Only non-secret state (the last run and
+its stats) would move to a durable store — Cloudflare D1 or KV keyed by batch, with the run log
+already providing the same records server-side. That is outside the current milestone, and the
+UI states the reset behaviour on the banner, Settings and Run history so nobody loses work
+without knowing.
 
 ## Deployment
 

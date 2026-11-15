@@ -109,7 +109,7 @@ async function chatCall(
 
 export function createFlashSummarizer(env: EnvReader): SummarizeFn {
   return async (ticket: Ticket): Promise<Summary> => {
-    const out = await chatCall(env, FLASH_MODEL, [
+    const out = await chatCall(env, env("COSTERA_MODEL") || FLASH_MODEL, [
       {
         role: "system",
         content:
@@ -131,6 +131,7 @@ function stripFences(text: string): string {
 
 export function createMaxAnalyzer(env: EnvReader): AnalyzeFn {
   return async (cluster: ClusterInput): Promise<Analysis> => {
+    const model = env("COSTERA_MODEL") || MAX_MODEL;
     const messages = [
       {
         role: "system",
@@ -141,11 +142,11 @@ export function createMaxAnalyzer(env: EnvReader): AnalyzeFn {
     ];
     let out: ChatOutcome;
     try {
-      out = await chatCall(env, MAX_MODEL, messages, 60000);
+      out = await chatCall(env, model, messages, 60000);
     } catch (e) {
       // one retry on transient reachability/timeout failures only
       if (e instanceof DecisionError && e.code === "tier2_unreachable") {
-        out = await chatCall(env, MAX_MODEL, messages, 60000);
+        out = await chatCall(env, model, messages, 60000);
       } else {
         throw e;
       }
