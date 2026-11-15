@@ -1,7 +1,7 @@
 # COSTERA — Triage Desk
 
 Kracked Devs bounty entry: **Build for Better Connectivity** — built by
-[Nazuru-san](https://krackeddevs.com/profile/nazlamp).
+[@nazlamp](https://krackeddevs.com/profile/nazlamp).
 
 A triage desk for a support agent at **ZephyrTel, a fictional telco**. It reads a batch of
 scattered tickets, routes each one to the cheapest lane that can handle it, and hands off to a

@@ -385,14 +385,14 @@ export default function App() {
             href="https://krackeddevs.com/profile/nazlamp"
             target="_blank"
             rel="noreferrer"
-            title="Built by Nazuru-san · Kracked Devs profile"
+            title="Built by @nazlamp · Kracked Devs profile"
             className="group block rounded-lg border border-teal-600/25 bg-gradient-to-br from-teal-50 to-emerald-50 px-3 py-2.5 shadow-sm shadow-teal-600/10 transition-colors hover:border-teal-600/50 dark:border-teal-500/25 dark:from-teal-950/50 dark:to-emerald-950/40 dark:hover:border-teal-400/50"
           >
             <p className="text-[10px] font-semibold uppercase tracking-wider text-teal-700/80 dark:text-teal-300/80">
               Built by
             </p>
             <p className="flex items-center gap-1 text-sm font-bold text-teal-800 dark:text-teal-200">
-              Nazuru-san
+              @nazlamp
               <ArrowUpRight className="size-3.5 opacity-50 transition-opacity group-hover:opacity-100" />
             </p>
             <p className="text-[11px] text-muted-foreground">Kracked Devs · demo workspace</p>
@@ -604,7 +604,7 @@ export default function App() {
                 rel="noreferrer"
                 className="font-semibold text-teal-700 underline decoration-teal-600/40 underline-offset-2 hover:text-teal-600 dark:text-teal-300 dark:hover:text-teal-200"
               >
-                Nazuru-san
+                @nazlamp
               </a>{" "}
               · Kracked Devs
             </p>
