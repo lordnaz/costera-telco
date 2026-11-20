@@ -8,6 +8,8 @@
 // bounty review. Without that flag the environment is never consulted.
 
 import type { EnvReader } from "./decision.ts";
+import { PRESET_SETUP } from "./presets.ts";
+import type { PresetId } from "./presets.ts";
 
 export type TierId = "decision" | "flash" | "max";
 export const TIER_IDS: TierId[] = ["decision", "flash", "max"];
@@ -120,11 +122,13 @@ export function effectiveCredentials(
   s: SessionCredentials | null,
   env: EnvReader,
   demoAccess = false,
+  preset: PresetId = "qwen",
 ): { tiers: Record<TierId, TierCredentials>; decisionEngine: "systemone" | "chat" } {
   const tiers = {} as Record<TierId, TierCredentials>;
   if (demoAccess) {
-    const key = env("COSTERA_API_KEY") ?? "";
-    const baseUrl = env("COSTERA_API_BASE_URL") ?? "";
+    const setup = PRESET_SETUP[preset];
+    const key = env(setup.keyVar) ?? "";
+    const baseUrl = env(setup.baseVar) ?? "";
     if (!key || !baseUrl) {
       throw new ReviewerAccessError("Temporary reviewer access is not enabled on this deployment.");
     }
@@ -133,10 +137,10 @@ export function effectiveCredentials(
       tiers[t] = {
         key,
         baseUrl,
-        model: s?.tiers[t].model || env(`COSTERA_MODEL_${t.toUpperCase()}`) || "",
+        model: s?.tiers[t].model || env(setup.modelVar(t)) || setup.defaults[t],
       };
     }
-    const engine = s?.decisionEngine ?? (env("COSTERA_DECISION_ENGINE") === "chat" ? "chat" : "systemone");
+    const engine = s?.decisionEngine ?? setup.engine(env);
     return { tiers, decisionEngine: engine };
   }
   const active = sessionActive(s);

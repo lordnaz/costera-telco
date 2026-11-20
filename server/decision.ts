@@ -11,6 +11,7 @@
 // Logs must never include headers, the API key, or the endpoint hostname.
 
 import type { Ticket } from "./data.ts";
+import { chatEndpoint } from "./endpoints.ts";
 
 export interface DecisionField {
   type: string;
@@ -211,7 +212,7 @@ export function createDecisionClassifier(env: EnvReader): ClassifyFn {
     const { endpointPath, body } =
       engine === "chat" ? buildChatClassifyRequest(ticket, model) : buildDecisionRequest(ticket, model);
     const href = baseUrl.href.endsWith("/") ? baseUrl.href : baseUrl.href + "/";
-    const endpoint = new URL(endpointPath, href);
+    const endpoint = engine === "chat" ? chatEndpoint(base) : new URL(endpointPath, href);
 
     const started = Date.now();
     try {

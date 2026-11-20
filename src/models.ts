@@ -21,6 +21,9 @@ export const MODELS: CatalogModel[] = [
   { id: "jeff", name: "JEFF", family: "Qwen MaaS", role: "light", in: 0.3, out: 0.6, classifierOnly: true },
   { id: "qwen3.8-flash", family: "Qwen", role: "light", in: 0.1, out: 0.4, recommended: true },
   { id: "qwen3.8-max", family: "Qwen", role: "flagship", in: 1.6, out: 6.4, recommended: true },
+  { id: "ilmu-mini-v3.3", family: "ILMU", role: "light", in: 0.15, out: 0.6 },
+  { id: "ilmu-glm-5.3-flash", family: "ILMU", role: "light", in: 0.1, out: 0.4 },
+  { id: "ilmu-glm-5.3", family: "ILMU", role: "flagship", in: 1.2, out: 4.8 },
   { id: "deepseek-chat", family: "DeepSeek", role: "light", in: 0.28, out: 0.42 },
   { id: "deepseek-reasoner", family: "DeepSeek", role: "flagship", in: 0.55, out: 2.19 },
   { id: "gpt-6-mini", family: "OpenAI", role: "light", in: 0.25, out: 1.0 },
@@ -38,12 +41,13 @@ export const modelById = (id: string): CatalogModel | undefined => MODELS.find((
 
 // Recommended picks are PER TIER, not per model: Tier 1 is the calibrated decision contract,
 // Tier 2 light is the cheap flash lane, Tier 2 heavy is the flagship analysis lane. The UI
-// marks these with a star in the dropdowns.
+// marks these with a star in the dropdowns. ILMU picks are owner-specified per tier (Tier 1
+// via the chat engine); unlike the Qwen trio they are not yet verified end-to-end.
 export type TierKey = "decision" | "flash" | "max";
 export const RECOMMENDED_BY_TIER: Record<TierKey, string[]> = {
-  decision: ["decision-model-preview", "jeff"],
-  flash: ["qwen3.8-flash"],
-  max: ["qwen3.8-max"],
+  decision: ["decision-model-preview", "jeff", "ilmu-mini-v3.3"],
+  flash: ["qwen3.8-flash", "ilmu-glm-5.3-flash"],
+  max: ["qwen3.8-max", "ilmu-glm-5.3"],
 };
 
 export const isRecommendedFor = (tier: TierKey, id: string): boolean => RECOMMENDED_BY_TIER[tier].includes(id);

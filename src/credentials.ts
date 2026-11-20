@@ -82,18 +82,26 @@ export const credentialsPayload = (c: SessionCreds) => {
 
 // Temporary reviewer opt-in: the server resolves key+endpoint from its own environment.
 // The browser sends model choices only — never a key, never a URL.
-export interface DemoAccessInfo {
-  ok: boolean;
+export type PresetId = "qwen" | "ilmu";
+
+export interface PresetAccessInfo {
   available: boolean;
   models: { decision: string; flash: string; max: string } | null;
   decisionEngine: "systemone" | "chat";
 }
 
+export interface DemoAccessInfo extends PresetAccessInfo {
+  ok: boolean;
+  ilmu: PresetAccessInfo;
+}
+
 export const demoCredentialsPayload = (
   models: { decision: string; flash: string; max: string },
   engine: "systemone" | "chat",
+  provider: PresetId = "qwen",
 ) => ({
   demoAccess: true,
+  demoProvider: provider,
   credentials: {
     baseUrl: "",
     key: "",

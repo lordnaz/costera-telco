@@ -6,6 +6,7 @@
 import type { Ticket } from "./data.ts";
 import { DecisionError } from "./decision.ts";
 import type { EnvReader } from "./decision.ts";
+import { chatEndpoint } from "./endpoints.ts";
 
 export const FLASH_MODEL = "qwen3.8-flash";
 export const MAX_MODEL = "qwen3.8-max";
@@ -64,13 +65,12 @@ async function chatCall(
     throw new DecisionError("invalid_base_url", "Server endpoint configuration is invalid.");
   }
   if (baseUrl.protocol !== "https:") throw new DecisionError("invalid_base_url", "Server endpoint must use HTTPS.");
-  const href = baseUrl.href.endsWith("/") ? baseUrl.href : baseUrl.href + "/";
   const body = { model, messages };
   const started = Date.now();
   try {
     let res: Response;
     try {
-      res = await fetch(new URL("chat/completions", href), {
+      res = await fetch(chatEndpoint(base), {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
         body: JSON.stringify(body),

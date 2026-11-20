@@ -332,12 +332,12 @@ async function call(handler, path, method = "GET", body) {
     MODELS.filter((m) => m.recommended).map((m) => m.id).join(","),
     "decision-model-preview,qwen3.8-flash,qwen3.8-max",
   );
-  assert.deepEqual(RECOMMENDED_BY_TIER.decision, ["decision-model-preview", "jeff"]);
-  assert.deepEqual(RECOMMENDED_BY_TIER.flash, ["qwen3.8-flash"]);
-  assert.deepEqual(RECOMMENDED_BY_TIER.max, ["qwen3.8-max"]);
+  assert.deepEqual(RECOMMENDED_BY_TIER.decision, ["decision-model-preview", "jeff", "ilmu-mini-v3.3"]);
+  assert.deepEqual(RECOMMENDED_BY_TIER.flash, ["qwen3.8-flash", "ilmu-glm-5.3-flash"]);
+  assert.deepEqual(RECOMMENDED_BY_TIER.max, ["qwen3.8-max", "ilmu-glm-5.3"]);
   assert.ok(DECISION_CONTRACT_OPTIONS.some((m) => m.id === "jeff"));
   assert.ok(!CHAT_OPTIONS.some((m) => m.classifierOnly), "classifier-only models must stay off chat lists");
-  for (const id of ["qwen3.8-flash", "qwen3.8-max", "deepseek-chat", "claude-opus-4-5", "kimi-k2-thinking"]) {
+  for (const id of ["qwen3.8-flash", "qwen3.8-max", "deepseek-chat", "claude-opus-4-5", "kimi-k2-thinking", "ilmu-mini-v3.3", "ilmu-glm-5.3-flash", "ilmu-glm-5.3"]) {
     assert.ok(CHAT_OPTIONS.some((m) => m.id === id), `Tier 2 lists must include ${id}`);
   }
   const r = ratesForModels({ decision: "jeff", flash: "qwen3.8-max", max: "qwen3.8-flash" });
@@ -346,6 +346,19 @@ async function call(handler, path, method = "GET", body) {
   assert.equal(r.flashIn, 1.6); // flagship priced on the light lane
   assert.equal(r.maxIn, 0.1); // light priced on the heavy lane
   console.log("PASS model catalogue (classifier-only off chat lists, both Tier 2 lanes list light + flagship)");
+}
+
+// Endpoint joining: root and full-chat-endpoint base forms must behave identically.
+{
+  const { chatEndpoint, modelsEndpoint } = await import("../server/endpoints.ts");
+  assert.equal(chatEndpoint("https://x.example/v1").href, "https://x.example/v1/chat/completions");
+  assert.equal(chatEndpoint("https://x.example/v1/").href, "https://x.example/v1/chat/completions");
+  assert.equal(chatEndpoint("https://x.example/v1/chat/completions").href, "https://x.example/v1/chat/completions");
+  assert.equal(chatEndpoint("https://x.example/v1/chat/completions/").href, "https://x.example/v1/chat/completions/");
+  assert.equal(modelsEndpoint("https://x.example/v1").href, "https://x.example/v1/models");
+  assert.equal(modelsEndpoint("https://x.example/v1/chat/completions").href, "https://x.example/v1/models");
+  assert.equal(modelsEndpoint("https://x.example/v1/chat/completions/").href, "https://x.example/v1/models");
+  console.log("PASS endpoint joining (root or full chat endpoint base; /models derived from root)");
 }
 
 // 15. Temporary reviewer access: explicit opt-in only, no silent env fallback, no secret leakage
@@ -396,6 +409,51 @@ async function call(handler, path, method = "GET", body) {
   assert.equal(r.status, 503);
   assert.equal((await r.json()).error, "reviewer_access_unavailable");
   console.log("PASS temporary reviewer access (opt-in only, no silent fallback, no secret leakage)");
+}
+
+// 16. ILMU preset: own env pair, chat engine, per-preset opt-in, no cross-preset fallback.
+{
+  const { createHandler } = await import("../server/handler.ts");
+  const { fixtureClassify } = await import("./fixtures.ts");
+  const { fixtureAnalyze, fixtureSummarize } = await import("./fixtures-tier2.ts");
+  const env = (n) =>
+    n === "COSTERA_ILMU_API_KEY" ? "ilmu-secret-key" : n === "COSTERA_ILMU_API_BASE_URL" ? "https://ilmu.example/v1" : undefined;
+  const h = createHandler(env, {
+    classify: fixtureClassify,
+    tier2: { summarize: fixtureSummarize, analyze: fixtureAnalyze },
+  });
+  // demo-access: qwen unavailable, ilmu available with the ILMU trio and chat engine
+  let r = await h(new Request("http://local/api/demo-access"));
+  const info = await r.json();
+  assert.equal(info.available, false);
+  assert.equal(info.ilmu.available, true);
+  assert.deepEqual(info.ilmu.models, { decision: "ilmu-mini-v3.3", flash: "ilmu-glm-5.3-flash", max: "ilmu-glm-5.3" });
+  assert.equal(info.ilmu.decisionEngine, "chat");
+  const raw = JSON.stringify(info);
+  assert.ok(!raw.includes("ilmu-secret-key") && !raw.includes("ilmu.example"));
+  // qwen opt-in must NOT borrow the ILMU env pair
+  r = await h(new Request("http://local/api/triage", { method: "POST", body: JSON.stringify({ demoAccess: true }) }));
+  assert.equal(r.status, 503);
+  assert.equal((await r.json()).error, "reviewer_access_unavailable");
+  // ilmu opt-in runs on the ILMU preset defaults and chat engine
+  r = await h(new Request("http://local/api/triage", { method: "POST", body: JSON.stringify({ demoAccess: true, demoProvider: "ilmu" }) }));
+  assert.equal(r.status, 200);
+  const j = await r.json();
+  assert.equal(j.keySource, "env");
+  assert.equal(j.decisionEngine, "chat");
+  assert.equal(j.models.decision, "ilmu-mini-v3.3");
+  assert.equal(j.models.flash, "ilmu-glm-5.3-flash");
+  assert.equal(j.models.max, "ilmu-glm-5.3");
+  // connection test resolves the ILMU env pair; unreachable host → stable error, no secret echo
+  r = await h(new Request("http://local/api/credentials", { method: "POST", body: JSON.stringify({ tier: "decision", demo: true, demoProvider: "ilmu" }) }));
+  const t = await r.json();
+  assert.equal(t.ok, false);
+  assert.ok(["credentials_unreachable", "credentials_rejected"].includes(t.error));
+  assert.ok(!JSON.stringify(t).includes("ilmu-secret-key"));
+  // unknown provider falls back to qwen (unavailable here)
+  r = await h(new Request("http://local/api/credentials", { method: "POST", body: JSON.stringify({ tier: "decision", demo: true, demoProvider: "bogus" }) }));
+  assert.equal((await r.json()).error, "reviewer_access_unavailable");
+  console.log("PASS ILMU preset (own env pair, chat engine, per-preset opt-in, no cross-preset fallback)");
 }
 
 console.log("ALL CHECKS PASSED");

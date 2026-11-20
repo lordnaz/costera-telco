@@ -32,6 +32,7 @@ import type { SessionCreds, TierEntry, TierId } from "../credentials";
 import { CHAT_OPTIONS, DECISION_CONTRACT_OPTIONS, families, isRecommendedFor } from "../models";
 import type { CatalogModel } from "../models";
 import type { Desk } from "../components/bits";
+import { QwenLogo, IlmuLogo } from "../components/brand";
 import { EmptyState, idleTest, InfoNote, ModelName, SectionCard, TicketChip, usd } from "../components/bits";
 import type { TestState } from "../components/bits";
 import { ModelCost } from "../components/ModelCost";
@@ -663,7 +664,10 @@ function ByoAccess({ desk }: { desk: Desk }) {
     else desk.setCreds({ ...desk.creds, decisionEngine: e });
   };
   const toggle = (k: string) => setShown((s) => ({ ...s, [k]: !s[k] }));
-  const setShared = (patch: Partial<Pick<SessionCreds, "key" | "baseUrl">>) => desk.setCreds({ ...desk.creds, ...patch });
+  const setShared = (patch: Partial<Pick<SessionCreds, "key" | "baseUrl">>) => {
+    desk.setCreds({ ...desk.creds, ...patch });
+    for (const t of TIERS) setTest(t.id, idleTest());
+  };
   const setTier = (id: TierId, patch: Partial<TierEntry>) => {
     desk.setCreds({ ...desk.creds, tiers: { ...desk.creds.tiers, [id]: { ...desk.creds.tiers[id], ...patch } } });
     setTest(id, idleTest());
@@ -730,7 +734,7 @@ function ByoAccess({ desk }: { desk: Desk }) {
     try {
       const r = await postJson<{ ok: boolean; models?: number | null; error?: string; message?: string }>(
         "/api/credentials",
-        demo ? { tier: id, demo: true } : { tier: id, key: e!.key, baseUrl: e!.baseUrl },
+        demo ? { tier: id, demo: true, demoProvider: desk.demoProvider } : { tier: id, key: e!.key, baseUrl: e!.baseUrl },
       );
       setTest(
         id,
@@ -787,7 +791,9 @@ function ByoAccess({ desk }: { desk: Desk }) {
           <div className="flex items-start gap-2.5 rounded-lg border border-violet-300/80 bg-violet-50/80 px-3.5 py-3 dark:border-violet-800/60 dark:bg-violet-950/30">
             <Hourglass className="mt-0.5 size-4 shrink-0 text-violet-700 dark:text-violet-300" />
             <div className="flex-1 text-xs text-violet-900 dark:text-violet-100">
-              <p className="text-[11px] font-semibold uppercase tracking-wide">Temporary reviewer access active</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide">
+                Temporary reviewer access active · {desk.demoProvider === "ilmu" ? "ILMU" : "Qwen"} preset
+              </p>
               <p className="mt-1">
                 The owner's pre-configured key and endpoint are used server-side for the bounty review window only.
                 They are never shown in this browser and cannot be edited here. This access will be disabled after the
@@ -802,12 +808,14 @@ function ByoAccess({ desk }: { desk: Desk }) {
           <div className="flex-1 text-xs text-amber-900 dark:text-amber-100">
             <p className="text-[11px] font-semibold uppercase tracking-wide">Reviewer testing disclaimer</p>
             <p className="mt-1">
-              The full end-to-end workflow — classify, route, escalate, brief and cost readout — has only been tested
-              with the Qwen family: <ModelName>decision-model-preview</ModelName> (Tier 1),{" "}
-              <ModelName>qwen3.8-flash</ModelName> (Tier 2 light) and <ModelName>qwen3.8-max</ModelName> (Tier 2 heavy).
-              Other providers and models share the same OpenAI-compatible contract but are not end-to-end verified:
-              response shapes, confidence calibration and assumed rates may differ. Use the per-tier Test button and
-              check the run trace before relying on results.
+              The full end-to-end workflow — classify, route, escalate, brief and cost readout — has been tested
+              and verified with two families: Qwen (<ModelName>decision-model-preview</ModelName> Tier 1,{" "}
+              <ModelName>qwen3.8-flash</ModelName> Tier 2 light, <ModelName>qwen3.8-max</ModelName> Tier 2 heavy)
+              and ILMU (<ModelName>ilmu-mini-v3.3</ModelName> Tier 1, <ModelName>ilmu-glm-5.3-flash</ModelName>{" "}
+              Tier 2 light, <ModelName>ilmu-glm-5.3</ModelName> Tier 2 heavy). Other providers and models share
+              the same OpenAI-compatible contract but are not end-to-end verified: response shapes, confidence
+              calibration and assumed rates may differ. Use the per-tier Test button and check the run trace
+              before relying on results.
             </p>
             <div className="mt-2.5 rounded-md border border-amber-300/60 bg-background/70 px-3 py-2.5 dark:border-amber-800/50 dark:bg-background/40">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-teal-700 dark:text-teal-300">
@@ -827,9 +835,18 @@ function ByoAccess({ desk }: { desk: Desk }) {
                   chat/completions
                 </li>
                 <li>
-                  <span className="font-medium">Endpoint:</span> an Alibaba MaaS (Qwen) OpenAI-compatible base URL
-                  ending in <span className="font-mono">/compatible-mode/v1</span>; one shared API key covers all three
-                  tiers.
+                  <span className="font-medium">ILMU family (also verified end-to-end):</span>{" "}
+                  <ModelName>ilmu-mini-v3.3</ModelName> (Tier 1), <ModelName>ilmu-glm-5.3-flash</ModelName> (Tier 2
+                  light), <ModelName>ilmu-glm-5.3</ModelName> (Tier 2 heavy) · all via chat/completions
+                </li>
+                <li>
+                  <span className="font-medium">Qwen endpoint:</span> an Alibaba MaaS (Qwen) OpenAI-compatible base
+                  URL ending in <span className="font-mono">/compatible-mode/v1</span>; one shared API key covers all
+                  three tiers.
+                </li>
+                <li>
+                  <span className="font-medium">ILMU endpoint:</span> an ILMU OpenAI-compatible base URL ending in{" "}
+                  <span className="font-mono">/v1</span>; one shared API key covers all three tiers.
                 </li>
               </ul>
               <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -837,13 +854,29 @@ function ByoAccess({ desk }: { desk: Desk }) {
                   <>
                     <Button
                       size="sm"
-                      onClick={desk.requestDemo}
-                      className="bg-gradient-to-r from-red-600 to-rose-500 text-white shadow-sm shadow-red-600/25 hover:from-red-500 hover:to-rose-400 hover:text-white"
+                      variant="outline"
+                      onClick={() => desk.requestDemo("qwen")}
+                      className="border-[#082dff]/30 bg-white text-[#082dff] shadow-sm hover:bg-[#082dff]/5 hover:text-[#082dff] dark:border-[#082dff]/60 dark:bg-white dark:hover:bg-[#082dff]/10"
                     >
-                      <Hourglass /> Use temporary reviewer access
+                      <QwenLogo className="size-4" /> Use Qwen-Family Model Preset
                     </Button>
                     <span className="text-[11px] text-muted-foreground">
-                      No key of your own? Borrow the owner's pre-setup access for the review window.
+                      No key of your own? Borrow the owner's Qwen pre-setup for the review window.
+                    </span>
+                  </>
+                )}
+                {!demo && desk.demoInfo?.ilmu?.available && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => desk.requestDemo("ilmu")}
+                      className="border-[#0048cc]/30 bg-white text-[#00205b] shadow-sm hover:bg-[#0048cc]/5 hover:text-[#0048cc] dark:border-[#0048cc]/60 dark:bg-white dark:hover:bg-[#0048cc]/10"
+                    >
+                      <IlmuLogo className="size-4" /> Use ILMU-Family Model Preset
+                    </Button>
+                    <span className="text-[11px] text-muted-foreground">
+                      ILMU family pre-setup: ilmu-mini-v3.3 · ilmu-glm-5.3-flash · ilmu-glm-5.3.
                     </span>
                   </>
                 )}
@@ -996,14 +1029,6 @@ function ByoAccess({ desk }: { desk: Desk }) {
                   </div>
                 ) : (
                   <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-                    <SecretInput
-                      value={desk.creds.tiers[t.id].key}
-                      onChange={(v) => setTier(t.id, { key: v })}
-                      placeholder="Per-tier key (else shared key)"
-                      shown={!!shown[t.id]}
-                      onToggle={() => toggle(t.id)}
-                      ariaLabel={`${t.model} API key`}
-                    />
                     <input
                       value={desk.creds.tiers[t.id].baseUrl}
                       onChange={(e) => setTier(t.id, { baseUrl: e.target.value })}
@@ -1012,6 +1037,14 @@ function ByoAccess({ desk }: { desk: Desk }) {
                       spellCheck={false}
                       aria-label={`${t.model} base URL`}
                       className="w-full rounded-lg border bg-background px-2.5 py-1.5 font-mono text-xs outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/25"
+                    />
+                    <SecretInput
+                      value={desk.creds.tiers[t.id].key}
+                      onChange={(v) => setTier(t.id, { key: v })}
+                      placeholder="Per-tier key (else shared key)"
+                      shown={!!shown[t.id]}
+                      onToggle={() => toggle(t.id)}
+                      ariaLabel={`${t.model} API key`}
                     />
                     <Button
                       size="sm"

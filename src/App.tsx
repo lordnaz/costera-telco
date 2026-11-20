@@ -37,7 +37,7 @@ import {
   TIERS,
   tierConfigured,
 } from "./credentials";
-import type { DemoAccessInfo, SessionCreds } from "./credentials";
+import type { DemoAccessInfo, PresetId, SessionCreds } from "./credentials";
 import type { Batch, Health, TriageResult } from "./types";
 import type { Desk, RunRecord, TierId, TestState, View } from "./components/bits";
 import { Drawer, idleTest, InfoNote, LaneBadge, ModelName, StageBadge } from "./components/bits";
@@ -101,6 +101,8 @@ export default function App() {
   const [demoMode, setDemoMode] = useState(false);
   const [demoModels, setDemoModels] = useState({ decision: "", flash: "", max: "" });
   const [demoEngine, setDemoEngine] = useState<"systemone" | "chat">("systemone");
+  const [demoProvider, setDemoProvider] = useState<PresetId>("qwen");
+  const [consentProvider, setConsentProvider] = useState<PresetId>("qwen");
   const [demoConsentOpen, setDemoConsentOpen] = useState(false);
 
   useEffect(() => {
@@ -192,7 +194,7 @@ export default function App() {
       const r = await postJson<TriageResult>("/api/triage", {
         includeTrace: true,
         ...(demoMode
-          ? demoCredentialsPayload(demoModels, demoEngine)
+          ? demoCredentialsPayload(demoModels, demoEngine, demoProvider)
           : payload
             ? { credentials: payload }
             : {}),
@@ -220,16 +222,18 @@ export default function App() {
     } finally {
       setRunning(false);
     }
-  }, [health, batch, creds, tierStatus, demoMode, demoModels, demoEngine]);
+  }, [health, batch, creds, tierStatus, demoMode, demoModels, demoEngine, demoProvider]);
 
   const enableDemo = useCallback(() => {
-    if (!demoInfo?.available || !demoInfo.models) return;
-    setDemoModels(demoInfo.models);
-    setDemoEngine(demoInfo.decisionEngine);
+    const info = consentProvider === "ilmu" ? demoInfo?.ilmu : demoInfo;
+    if (!info?.available || !info.models) return;
+    setDemoModels(info.models);
+    setDemoEngine(info.decisionEngine);
+    setDemoProvider(consentProvider);
     setDemoMode(true);
     setDemoConsentOpen(false);
     setTierStatusState({ decision: idleTest(), flash: idleTest(), max: idleTest() });
-  }, [demoInfo]);
+  }, [demoInfo, consentProvider]);
 
   const exitDemo = useCallback(() => {
     setDemoMode(false);
@@ -273,6 +277,8 @@ export default function App() {
   const byo = sessionActive(creds);
   const tiersComplete = allTiersConfigured(creds);
   const canRun = Boolean(health && batch) && !running && !result;
+  const presetLabel = demoProvider === "ilmu" ? "ILMU" : "Qwen";
+  const consentInfo = consentProvider === "ilmu" ? demoInfo?.ilmu : demoInfo;
 
   const desk: Desk = {
     health,
@@ -304,7 +310,11 @@ export default function App() {
     setDemoModels,
     demoEngine,
     setDemoEngine,
-    requestDemo: () => setDemoConsentOpen(true),
+    demoProvider,
+    requestDemo: (p) => {
+      setConsentProvider(p);
+      setDemoConsentOpen(true);
+    },
     exitDemo,
     copyBrief,
     copied,
@@ -424,7 +434,7 @@ export default function App() {
                   title="Owner-provided server-side access for the bounty review window only — retired after review. Click to open Settings."
                   onClick={() => setView("settings")}
                 >
-                  <Hourglass /> Temporary reviewer access
+                  <Hourglass /> Temporary reviewer access · {presetLabel}
                 </Badge>
               ) : byo ? (
                 <Badge
@@ -525,7 +535,7 @@ export default function App() {
                 <AlertTriangle className="size-3.5 shrink-0" />
                 <span className="min-w-0 flex-1">
                   {demoMode
-                    ? "Temporary reviewer access is active — the owner's key and endpoint stay server-side. This access is retired after the bounty review."
+                    ? `Temporary reviewer access (${presetLabel} preset) is active — the owner's key and endpoint stay server-side. This access is retired after the bounty review.`
                     : !byo
                       ? "No API access this session — add your own key in Settings, or use the temporary reviewer access offered there."
                       : "Session setup is incomplete — every tier needs a key, an HTTPS endpoint and a chosen model before triage can run."}
@@ -710,12 +720,25 @@ export default function App() {
           />
           <div className="rise scrollbar-thin relative max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-xl border bg-card p-4 shadow-2xl sm:p-5">
             <h2 id="demo-consent-title" className="flex items-center gap-2 text-base font-semibold tracking-tight">
-              <Hourglass className="size-4 text-violet-600 dark:text-violet-400" /> Temporary reviewer access
+              <Hourglass className="size-4 text-violet-600 dark:text-violet-400" /> Temporary reviewer access ·{" "}
+              {consentProvider === "ilmu" ? "ILMU" : "Qwen"} preset
             </h2>
             <p className="mt-1.5 text-sm text-muted-foreground">
               No API key of your own? The desk can borrow the owner's pre-configured access, held server-side, so you
               can review the full workflow end to end.
             </p>
+            {consentInfo?.models && (
+              <p className="mt-2 rounded-md border bg-muted/50 px-3 py-2 font-mono text-[11px]">
+                {consentInfo.models.decision} (Tier 1) · {consentInfo.models.flash} (Tier 2 light) ·{" "}
+                {consentInfo.models.max} (Tier 2 heavy)
+              </p>
+            )}
+            {consentProvider === "ilmu" && (
+              <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                The ILMU preset classifies Tier 1 via the chat engine (self-reported confidence) and is not yet
+                verified end-to-end — check the run trace before relying on results.
+              </p>
+            )}
             <ul className="mt-3 space-y-2 text-sm">
               <li className="flex gap-2">
                 <Hourglass className="mt-0.5 size-4 shrink-0 text-violet-600 dark:text-violet-400" />
@@ -762,7 +785,7 @@ export default function App() {
                 className="bg-gradient-to-r from-violet-600 to-teal-600 text-white shadow-sm shadow-violet-600/25 hover:from-violet-500 hover:to-teal-500 hover:text-white"
                 onClick={enableDemo}
               >
-                <Hourglass /> Use temporary access
+                <Hourglass /> Use temporary {consentProvider === "ilmu" ? "ILMU" : "Qwen"} access
               </Button>
             </div>
           </div>

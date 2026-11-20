@@ -18,6 +18,9 @@ import {
 import type { SessionCredentials, TierId } from "./credentials.ts";
 import { createDecisionClassifier, CHAT_CLASSIFIER_MODEL, DECISION_MODEL } from "./decision.ts";
 import type { ClassifyFn, EnvReader } from "./decision.ts";
+import { modelsEndpoint } from "./endpoints.ts";
+import { isPresetId, presetInfo, PRESET_SETUP } from "./presets.ts";
+import type { PresetId } from "./presets.ts";
 import { createFlashSummarizer, createMaxAnalyzer, FLASH_MODEL, MAX_MODEL } from "./tier2.ts";
 import { runTriage } from "./triage.ts";
 import type { Tier2Deps, TraceEntry, TriageStats } from "./triage.ts";
@@ -77,19 +80,7 @@ export function createHandler(env: EnvReader, opts: HandlerOpts = {}) {
     if (route === "demo-access") {
       if (request.method !== "GET") return json({ ok: false, error: "method_not_allowed" }, 405);
       // Availability + model names only. The key and endpoint hostname never leave the server.
-      const available = configured();
-      return json({
-        ok: true,
-        available,
-        models: available
-          ? {
-              decision: env("COSTERA_MODEL_DECISION") || DECISION_MODEL,
-              flash: env("COSTERA_MODEL_FLASH") || FLASH_MODEL,
-              max: env("COSTERA_MODEL_MAX") || MAX_MODEL,
-            }
-          : null,
-        decisionEngine: env("COSTERA_DECISION_ENGINE") === "chat" ? "chat" : "systemone",
-      });
+      return json({ ok: true, ...presetInfo(env, "qwen"), ilmu: presetInfo(env, "ilmu") });
     }
 
     if (route === "triage") {
@@ -97,6 +88,7 @@ export function createHandler(env: EnvReader, opts: HandlerOpts = {}) {
       let ticketIds: string[] | undefined;
       let includeTrace = false;
       let demoAccess = false;
+      let demoProvider: PresetId = "qwen";
       let session: SessionCredentials | null = null;
       let raw: string;
       try {
@@ -116,6 +108,7 @@ export function createHandler(env: EnvReader, opts: HandlerOpts = {}) {
           const obj = body as Record<string, unknown>;
           includeTrace = obj.includeTrace === true;
           demoAccess = obj.demoAccess === true;
+          if (isPresetId(obj.demoProvider)) demoProvider = obj.demoProvider;
           try {
             session = parseSessionCredentials(obj.credentials);
           } catch (e) {
@@ -150,7 +143,7 @@ export function createHandler(env: EnvReader, opts: HandlerOpts = {}) {
           503,
         );
       }
-      if (!fixtureClassify && demoAccess && !configured()) {
+      if (!fixtureClassify && demoAccess && !presetInfo(env, demoProvider).available) {
         return json(
           {
             ok: false,
@@ -162,7 +155,7 @@ export function createHandler(env: EnvReader, opts: HandlerOpts = {}) {
       }
       let eff: ReturnType<typeof effectiveCredentials>;
       try {
-        eff = effectiveCredentials(session, env, demoAccess);
+        eff = effectiveCredentials(session, env, demoAccess, demoProvider);
       } catch (e) {
         if (e instanceof ReviewerAccessError) return json({ ok: false, error: e.code, message: e.message }, 503);
         return json(
@@ -225,16 +218,19 @@ export function createHandler(env: EnvReader, opts: HandlerOpts = {}) {
       let key: string;
       let baseUrl: string;
       if (obj.demo === true) {
-        // Temporary reviewer opt-in: test the server-side env access without ever
-        // sending the key or endpoint to the browser.
-        if (!configured()) {
+        // Temporary reviewer opt-in: test the selected preset's server-side env access
+        // without ever sending the key or endpoint to the browser.
+        const setup = PRESET_SETUP[isPresetId(obj.demoProvider) ? obj.demoProvider : "qwen"];
+        const k = env(setup.keyVar);
+        const u = env(setup.baseVar);
+        if (!k || !u) {
           return json(
             { ok: false, error: "reviewer_access_unavailable", message: "Temporary reviewer access is not enabled on this deployment." },
             200,
           );
         }
-        key = env("COSTERA_API_KEY") ?? "";
-        baseUrl = env("COSTERA_API_BASE_URL") ?? "";
+        key = k;
+        baseUrl = u;
       } else {
         const k = obj.key;
         const u = obj.baseUrl;
@@ -253,9 +249,8 @@ export function createHandler(env: EnvReader, opts: HandlerOpts = {}) {
           400,
         );
       }
-      const href = baseUrl.endsWith("/") ? baseUrl : baseUrl + "/";
       try {
-        const res = await fetch(new URL("models", href), {
+        const res = await fetch(modelsEndpoint(baseUrl), {
           headers: { Authorization: `Bearer ${key.trim()}` },
           signal: AbortSignal.timeout(10000),
         });

@@ -1,6 +1,6 @@
 import { useEffect, type ComponentType, type ReactNode } from "react";
 import { AlertTriangle, Info, X } from "lucide-react";
-import type { DemoAccessInfo, SessionCreds } from "../credentials";
+import type { DemoAccessInfo, PresetId, SessionCreds } from "../credentials";
 import type { Batch, Health, TicketResult, TraceEntry, TriageResult } from "../types";
 
 export type View =
@@ -60,7 +60,8 @@ export interface Desk {
   setDemoModels: (m: { decision: string; flash: string; max: string }) => void;
   demoEngine: "systemone" | "chat";
   setDemoEngine: (e: "systemone" | "chat") => void;
-  requestDemo: () => void;
+  demoProvider: PresetId;
+  requestDemo: (p: PresetId) => void;
   exitDemo: () => void;
   copyBrief: () => void;
   copied: boolean;
