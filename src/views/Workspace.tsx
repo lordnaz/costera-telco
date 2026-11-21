@@ -28,7 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { postJson } from "../api";
 import { computeCost, ratesForModels } from "../cost";
-import { decisionReady, effective, effectiveModel, emptyCreds, sessionActive, sessionModels, TIERS } from "../credentials";
+import { allTiersConfigured, decisionReady, effective, effectiveModel, emptyCreds, sessionActive, sessionModels, TIERS } from "../credentials";
 import type { SessionCreds, TierEntry, TierId } from "../credentials";
 import { CHAT_OPTIONS, DECISION_CONTRACT_OPTIONS, families, isRecommendedFor } from "../models";
 import type { CatalogModel } from "../models";
@@ -743,10 +743,7 @@ function ByoAccess({ desk }: { desk: Desk }) {
         r.ok
           ? {
               state: "ok",
-              message:
-                r.models != null
-                  ? `Access confirmed: ${r.models} models visible on this endpoint`
-                  : "Access confirmed: key accepted by endpoint",
+              message: "Access confirmed",
             }
           : { state: "error", message: r.message ?? r.error ?? "Rejected by endpoint." },
       );
@@ -1004,7 +1001,6 @@ function ByoAccess({ desk }: { desk: Desk }) {
                     </span>
                     <Button
                       size="sm"
-                      variant="outline"
                       disabled={ts.state === "testing"}
                       onClick={() => test(t.id)}
                     >
@@ -1032,7 +1028,6 @@ function ByoAccess({ desk }: { desk: Desk }) {
                     />
                     <Button
                       size="sm"
-                      variant="outline"
                       disabled={ts.state === "testing"}
                       onClick={() => test(t.id)}
                     >
@@ -1067,6 +1062,13 @@ function ByoAccess({ desk }: { desk: Desk }) {
               : "Session key detected, but the Tier 1 classifier key and HTTPS endpoint are incomplete; triage stays blocked until they are set."
             : "No session key set. This deployment has no server-side key of its own, so real runs need your own access here."}
         </InfoNote>
+        {(demo || allTiersConfigured(desk.creds)) && (
+          <div>
+            <Button onClick={() => desk.setView("overview")}>
+              <ArrowRight /> {desk.result ? "See the results" : "Continue to triage"}
+            </Button>
+          </div>
+        )}
         <div className="rounded-md border border-rule bg-paper-2 px-4 py-2.5">
           <button
             type="button"
