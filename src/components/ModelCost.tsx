@@ -6,35 +6,8 @@ import type { RunModels } from "../models";
 import type { TriageStats } from "../types";
 import { ModelName, tok, usd } from "./bits";
 
-const TONES = {
-  emerald: {
-    card: "border-emerald-200/80 bg-emerald-50/60 dark:border-emerald-900/60 dark:bg-emerald-950/25",
-    chip: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300",
-    label: "text-emerald-700 dark:text-emerald-300",
-    rule: "border-emerald-200/70 dark:border-emerald-900/50",
-  },
-  violet: {
-    card: "border-violet-200/80 bg-violet-50/60 dark:border-violet-900/60 dark:bg-violet-950/25",
-    chip: "bg-violet-100 text-violet-700 dark:bg-violet-900/60 dark:text-violet-300",
-    label: "text-violet-700 dark:text-violet-300",
-    rule: "border-violet-200/70 dark:border-violet-900/50",
-  },
-  sky: {
-    card: "border-sky-200/80 bg-sky-50/60 dark:border-sky-900/60 dark:bg-sky-950/25",
-    chip: "bg-sky-100 text-sky-700 dark:bg-sky-900/60 dark:text-sky-300",
-    label: "text-sky-700 dark:text-sky-300",
-    rule: "border-sky-200/70 dark:border-sky-900/50",
-  },
-  fuchsia: {
-    card: "border-fuchsia-200/80 bg-fuchsia-50/60 dark:border-fuchsia-900/60 dark:bg-fuchsia-950/25",
-    chip: "bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/60 dark:text-fuchsia-300",
-    label: "text-fuchsia-700 dark:text-fuchsia-300",
-    rule: "border-fuchsia-200/70 dark:border-fuchsia-900/50",
-  },
-} as const;
-
-type Tone = keyof typeof TONES;
-
+// One paper recipe for every lane card — the lane name carries the meaning,
+// not a per-tier hue (Cobalt: one signal, semantic status ink only).
 function ModelCard({
   tier,
   model,
@@ -42,7 +15,6 @@ function ModelCard({
   role,
   usage,
   cost,
-  tone,
   icon: Icon,
 }: {
   tier: string;
@@ -51,16 +23,12 @@ function ModelCard({
   role: string;
   usage: string | null;
   cost: number | null;
-  tone: Tone;
   icon: typeof Database;
 }) {
-  const t = TONES[tone];
   return (
-    <div className={`rounded-xl border px-3.5 py-3 shadow-xs sm:px-4 ${t.card}`}>
-      <p className={`flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide ${t.label}`}>
-        <span className={`flex size-6 items-center justify-center rounded-md ${t.chip}`}>
-          <Icon className="size-3.5" />
-        </span>
+    <div className="cut-sm bg-paper px-3.5 py-3 shadow-[var(--shadow-card)] sm:px-4">
+      <p className="flex items-center gap-1.5 text-[11px] font-semibold text-ink-3">
+        <Icon className="size-3.5" />
         {tier}
       </p>
       <p className="mt-1.5 break-all font-mono text-sm">
@@ -68,14 +36,14 @@ function ModelCard({
       </p>
       <p className="mt-1 text-xs text-muted-foreground">{role}</p>
       {usage !== null && cost !== null ? (
-        <div className={`mt-2 border-t pt-2 ${t.rule}`}>
+        <div className="mt-2 border-t border-rule pt-2">
           <p className="text-[11px] text-muted-foreground">{usage}</p>
           <p className="mt-0.5 font-mono text-sm font-semibold">
-            ≈ {usd(cost)} <span className="font-sans text-[10px] font-normal text-muted-foreground">est.</span>
+            ≈ {usd(cost)} <span className="font-sans text-[11px] font-normal text-muted-foreground">est.</span>
           </p>
         </div>
       ) : (
-        <p className={`mt-2 border-t pt-2 text-[11px] italic text-muted-foreground ${t.rule}`}>
+        <p className="mt-2 border-t border-rule pt-2 text-[11px] italic text-muted-foreground">
           Usage and cost appear after a run.
         </p>
       )}
@@ -107,61 +75,55 @@ export function ModelCost({
   };
   const cards = [
     {
-      tier: "Direct · code lane",
+      tier: "Direct / code lane",
       model: null as string | null,
-      empty: "No model call — deterministic lookup",
+      empty: "No model call: deterministic lookup",
       role: "Deterministic lookups: plans, accounts, outages. Zero model tokens.",
-      usage: stats ? `${stats.lanes.direct ?? 0} tickets · 0 tokens` : null,
+      usage: stats ? `${stats.lanes.direct ?? 0} tickets, 0 tokens` : null,
       cost: lanes ? lanes.direct : null,
-      tone: "emerald" as Tone,
       icon: Database,
     },
     {
-      tier: "Tier 1 · classifier",
+      tier: "Tier 1 classifier",
       model: decisionModel,
-      empty: "Not chosen yet — set it in Settings",
+      empty: "Not chosen yet. Set it in Settings.",
       role: "Reads every ticket: intent + complexity with confidence, then routes it.",
-      usage: stats ? `${stats.tier1Calls} calls · ${tok(stats.inputTokens)} tok in · ${ms(stats.avgLatencyMs)}` : null,
+      usage: stats ? `${stats.tier1Calls} calls, ${tok(stats.inputTokens)} tok in, ${ms(stats.avgLatencyMs)}` : null,
       cost: lanes ? lanes.tier1 : null,
-      tone: "violet" as Tone,
       icon: ScanSearch,
     },
     {
-      tier: "Tier 2 · light",
+      tier: "Tier 2 light",
       model: flashModel,
-      empty: "Not chosen yet — set it in Settings",
+      empty: "Not chosen yet. Set it in Settings.",
       role: "Plain-language summaries for the escalation set and human queue.",
       usage: stats
-        ? `${stats.tier2.light.calls} calls · ${tok(stats.tier2.light.inputTokens)} in / ${tok(stats.tier2.light.outputTokens)} out · ${ms(stats.tier2.light.avgLatencyMs)}`
+        ? `${stats.tier2.light.calls} calls, ${tok(stats.tier2.light.inputTokens)} in / ${tok(stats.tier2.light.outputTokens)} out, ${ms(stats.tier2.light.avgLatencyMs)}`
         : null,
       cost: lanes ? lanes.flash : null,
-      tone: "sky" as Tone,
       icon: Zap,
     },
     {
-      tier: "Tier 2 · heavy",
+      tier: "Tier 2 heavy",
       model: maxModel,
-      empty: "Not chosen yet — set it in Settings",
-      role: "Cross-ticket cluster analysis — only clusters that warrant it.",
+      empty: "Not chosen yet. Set it in Settings.",
+      role: "Cross-ticket cluster analysis, only clusters that warrant it.",
       usage: stats
-        ? `${stats.tier2.heavy.calls} calls · ${tok(stats.tier2.heavy.inputTokens)} in / ${tok(stats.tier2.heavy.outputTokens)} out · ${ms(stats.tier2.heavy.avgLatencyMs)}`
+        ? `${stats.tier2.heavy.calls} calls, ${tok(stats.tier2.heavy.inputTokens)} in / ${tok(stats.tier2.heavy.outputTokens)} out, ${ms(stats.tier2.heavy.avgLatencyMs)}`
         : null,
       cost: lanes ? lanes.max : null,
-      tone: "fuchsia" as Tone,
       icon: Brain,
     },
   ];
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          <span className="flex size-6 items-center justify-center rounded-md bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300">
-            <Route className="size-3.5" />
-          </span>
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-ink">
+          <Route className="size-3.5 text-ink-3" />
           Models &amp; cost routing
         </h3>
         <p className="text-xs text-muted-foreground">
-          Cheapest lane that can finish the job · flagship only when a cluster warrants it
+          Cheapest lane that can finish the job; flagship only when a cluster warrants it
         </p>
       </div>
       <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -174,20 +136,19 @@ export function ModelCost({
             role={c.role}
             usage={c.usage}
             cost={c.cost}
-            tone={c.tone}
             icon={c.icon}
           />
         ))}
       </div>
       {cost && (
-        <div className="mt-4 rounded-xl border bg-muted/40 p-4 dark:bg-muted/20">
+        <div className="cut-sm mt-4 bg-paper-2 p-4">
           <div className="flex flex-wrap items-center gap-2">
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <h4 className="text-xs font-semibold text-ink-3">
               What routing saved on this run
             </h4>
             <Badge variant="outline">estimate</Badge>
           </div>
-          <p className="mt-2 max-w-3xl text-sm">
+          <p className="measure mt-2 text-sm">
             The baseline below is what this same work would cost if every step went to{" "}
             {maxModel ? (
               <ModelName>{maxModel}</ModelName>
@@ -195,7 +156,7 @@ export function ModelCost({
               <span className="font-medium">the heaviest model you configured</span>
             )}
             , the strongest and most expensive model in this run. The router instead sends each step to the cheapest
-            model that can finish it — no model for deterministic lookups, the classifier for decisions, the light lane
+            model that can finish it: no model for deterministic lookups, the classifier for decisions, the light lane
             for summaries, the heavy lane only for warranted clusters. The gap between the two bars is what routing
             saved.
           </p>
@@ -203,38 +164,38 @@ export function ModelCost({
             <div className="space-y-2.5">
               <div>
                 <div className="flex items-baseline justify-between gap-2 text-[11px] text-muted-foreground">
-                  <span>Routed — the actual model mix used</span>
+                  <span>Routed: the actual model mix used</span>
                   <span className="font-mono text-xs font-semibold text-foreground">{usd(cost.routed)}</span>
                 </div>
-                <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted">
+                <div className="mt-1 h-2 overflow-hidden rounded-[2px] bg-paper-3">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400"
+                    className="h-full rounded-[2px] bg-ok"
                     style={{ width: `${cost.baseline > 0 ? Math.max(2, (cost.routed / cost.baseline) * 100) : 0}%` }}
                   />
                 </div>
               </div>
               <div>
                 <div className="flex items-baseline justify-between gap-2 text-[11px] text-muted-foreground">
-                  <span>All-flagship baseline — same work, everything on {maxModel ?? "the heavy lane model"}</span>
+                  <span>All-flagship baseline: same work, everything on {maxModel ?? "the heavy lane model"}</span>
                   <span className="font-mono text-xs font-semibold text-foreground">{usd(cost.baseline)}</span>
                 </div>
-                <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted">
-                  <div className="h-full w-full rounded-full bg-red-400 dark:bg-red-500" />
+                <div className="mt-1 h-2 overflow-hidden rounded-[2px] bg-paper-3">
+                  <div className="h-full w-full rounded-[2px] bg-error" />
                 </div>
               </div>
             </div>
             <div className="flex items-baseline justify-between gap-3 sm:block sm:text-right">
               <p className="text-xs text-muted-foreground">Saved by routing</p>
-              <p className="bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text font-mono text-2xl font-semibold text-transparent dark:from-emerald-400 dark:to-teal-300">
-                {cost.savingsPct !== null ? `${cost.savingsPct.toFixed(0)}%` : "—"}
+              <p className="font-mono text-2xl font-semibold text-ok">
+                {cost.savingsPct !== null ? `${cost.savingsPct.toFixed(0)}%` : "n/a"}
               </p>
               <p className="text-[11px] text-muted-foreground">≈ {usd(cost.baseline - cost.routed)} avoided</p>
             </div>
           </div>
           <p className="mt-3 text-[11px] text-muted-foreground">
             Estimates at assumed rates per million tokens (in/out): {decisionModel ?? "classifier"}{" "}
-            {rateNote(decisionModel, DEFAULT_RATES.decisionIn, DEFAULT_RATES.decisionOut)} · {flashModel ?? "light lane"}{" "}
-            {rateNote(flashModel, DEFAULT_RATES.flashIn, DEFAULT_RATES.flashOut)} · {maxModel ?? "heavy lane"}{" "}
+            {rateNote(decisionModel, DEFAULT_RATES.decisionIn, DEFAULT_RATES.decisionOut)}, {flashModel ?? "light lane"}{" "}
+            {rateNote(flashModel, DEFAULT_RATES.flashIn, DEFAULT_RATES.flashOut)}, {maxModel ?? "heavy lane"}{" "}
             {rateNote(maxModel, DEFAULT_RATES.maxIn, DEFAULT_RATES.maxOut)}. Tier 1 reports input tokens only; the
             direct lane uses no model. Not billing truth.
           </p>

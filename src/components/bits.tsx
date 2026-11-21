@@ -1,5 +1,5 @@
 import { useEffect, type ComponentType, type ReactNode } from "react";
-import { AlertTriangle, Info, X } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, CircleCheck, CircleX, Info, TriangleAlert, X } from "lucide-react";
 import type { DemoAccessInfo, PresetId, SessionCreds } from "../credentials";
 import type { Batch, Health, TicketResult, TraceEntry, TriageResult } from "../types";
 
@@ -74,16 +74,18 @@ export function ModelName({ children }: { children: ReactNode }) {
   return <span className="model-name font-mono">{children}</span>;
 }
 
+// Status is text with one icon, never a filled chip (Cobalt).
 export function LaneBadge({ lane }: { lane: TicketResult["lane"] }) {
   const map = {
-    direct: ["bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300", "Direct / code", "Deterministic knowledge-base lookup — no generation call"],
-    human_review: ["bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300", "Human review", "Handed to a human — never auto-resolved"],
-    tier2_candidate: ["bg-violet-50 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300", "Tier 2 candidate", "Escalated to Tier 2: a light-lane summary, and heavy-lane analysis if the cluster warrants it"],
-    error: ["bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300", "Error", "Classification failed for this ticket — see run log"],
+    direct: ["text-ok", CircleCheck, "Direct / code", "Deterministic knowledge-base lookup, no generation call"],
+    human_review: ["text-warn", TriangleAlert, "Human review", "Handed to a human, never auto-resolved"],
+    tier2_candidate: ["text-signal-deep", ArrowUpRight, "Tier 2 candidate", "Escalated to Tier 2: a light-lane summary, and heavy-lane analysis if the cluster warrants it"],
+    error: ["text-error", CircleX, "Error", "Classification failed for this ticket, see run log"],
   } as const;
-  const [cls, label, tip] = map[lane];
+  const [cls, Icon, label, tip] = map[lane];
   return (
-    <span title={tip} className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-medium ${cls}`}>
+    <span title={tip} className={`inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-medium ${cls}`}>
+      <Icon className="size-3" />
       {label}
     </span>
   );
@@ -91,12 +93,11 @@ export function LaneBadge({ lane }: { lane: TicketResult["lane"] }) {
 
 export function StageBadge({ stage }: { stage: TraceEntry["stage"] }) {
   const map = {
-    tier1: ["bg-violet-50 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300", "Tier 1"],
-    tier2_light: ["bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300", "Tier 2 light"],
-    tier2_heavy: ["bg-fuchsia-50 text-fuchsia-700 dark:bg-fuchsia-950/60 dark:text-fuchsia-300", "Tier 2 heavy"],
+    tier1: "Tier 1",
+    tier2_light: "Tier 2 light",
+    tier2_heavy: "Tier 2 heavy",
   } as const;
-  const [cls, label] = map[stage];
-  return <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${cls}`}>{label}</span>;
+  return <span className="inline-flex rounded-md border border-rule px-1.5 py-0.5 text-[11px] font-medium text-ink-3">{map[stage]}</span>;
 }
 
 export function ConfidenceBar({
@@ -106,58 +107,48 @@ export function ConfidenceBar({
   value: number | null;
   probabilities?: Record<string, number> | null;
 }) {
-  if (value === null) return <span className="text-xs text-muted-foreground">—</span>;
+  if (value === null) return <span className="text-xs text-muted-foreground">n/a</span>;
   const pct = Math.round(value * 100);
-  const tone = value < 0.7 ? "bg-amber-500" : "bg-teal-500";
+  const tone = value < 0.7 ? "bg-warn" : "bg-ok";
   const tip =
     probabilities && Object.keys(probabilities).length > 0
-      ? `Tier 1 classifier · ${Object.entries(probabilities)
+      ? `Tier 1 classifier: ${Object.entries(probabilities)
           .map(([k, v]) => `${k} ${Math.round(v * 100)}%`)
-          .join(" · ")}`
+          .join(", ")}`
       : "Tier 1 classifier confidence";
   return (
     <span className="inline-flex items-center gap-2" title={tip}>
-      <span className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
-        <span className={`block h-full rounded-full ${tone}`} style={{ width: `${pct}%` }} />
+      <span className="h-1.5 w-16 overflow-hidden rounded-[2px] bg-paper-3">
+        <span className={`block h-full rounded-[2px] ${tone}`} style={{ width: `${pct}%` }} />
       </span>
       <span className="font-mono text-xs">{pct}%</span>
     </span>
   );
 }
 
-const KPI_TONES = {
-  blue: ["bg-blue-50/70 border-blue-100 dark:bg-blue-950/30 dark:border-blue-900/50", "bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300"],
-  amber: ["bg-amber-50/70 border-amber-100 dark:bg-amber-950/30 dark:border-amber-900/50", "bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300"],
-  violet: ["bg-violet-50/70 border-violet-100 dark:bg-violet-950/30 dark:border-violet-900/50", "bg-violet-100 text-violet-700 dark:bg-violet-900/60 dark:text-violet-300"],
-  teal: ["bg-teal-50/70 border-teal-100 dark:bg-teal-950/30 dark:border-teal-900/50", "bg-teal-100 text-teal-700 dark:bg-teal-900/60 dark:text-teal-300"],
-} as const;
-
+// tone and delay are kept for call-site compatibility; app screens take no
+// reveal-on-load and no per-tile hues — one paper panel, one ink.
 export function Kpi({
   icon: Icon,
   label,
   value,
   sub,
-  tone,
-  delay = 0,
 }: {
   icon: ComponentType<{ className?: string }>;
   label: string;
   value: string;
   sub: string;
-  tone: keyof typeof KPI_TONES;
+  tone?: string;
   delay?: number;
 }) {
-  const [card, chip] = KPI_TONES[tone];
   return (
-    <div className={`rise rounded-xl border px-3 py-3 shadow-xs sm:px-4 sm:py-3.5 ${card}`} style={{ animationDelay: `${delay}ms` }}>
-      <div className="flex items-center gap-2 sm:gap-2.5">
-        <span className={`flex size-7 shrink-0 items-center justify-center rounded-lg sm:size-8 ${chip}`}>
-          <Icon className="size-3.5 sm:size-4" />
-        </span>
-        <p className="text-[11px] font-medium text-muted-foreground sm:text-xs">{label}</p>
+    <div className="panel px-3 py-3 sm:px-4 sm:py-3.5">
+      <div className="flex items-center gap-1.5">
+        <Icon className="size-3.5 shrink-0 text-ink-3" />
+        <p className="text-[11px] font-medium text-ink-3 sm:text-xs">{label}</p>
       </div>
       <p className="mt-1.5 font-mono text-xl font-semibold tracking-tight sm:mt-2 sm:text-2xl">{value}</p>
-      <p className="mt-0.5 text-[10px] text-muted-foreground sm:text-[11px]">{sub}</p>
+      <p className="mt-0.5 text-[11px] text-ink-3">{sub}</p>
     </div>
   );
 }
@@ -168,7 +159,6 @@ export function SectionCard({
   action,
   children,
   className = "",
-  delay = 0,
 }: {
   title: ReactNode;
   sub?: ReactNode;
@@ -178,7 +168,7 @@ export function SectionCard({
   delay?: number;
 }) {
   return (
-    <section className={`rise rounded-xl border bg-card shadow-xs ${className}`} style={{ animationDelay: `${delay}ms` }}>
+    <section className={`panel ${className}`}>
       <header className="flex flex-wrap items-start justify-between gap-2 px-4 pb-3 pt-4 sm:px-5">
         <div className="min-w-0">
           <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight">{title}</h2>
@@ -194,11 +184,11 @@ export function SectionCard({
 export function InfoNote({ children, tone = "muted" }: { children: ReactNode; tone?: "muted" | "amber" }) {
   const cls =
     tone === "amber"
-      ? "bg-amber-50 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200"
-      : "bg-muted/70 text-muted-foreground";
+      ? "bg-paper-2 text-warn"
+      : "bg-paper-2 text-ink-3";
   const Icon = tone === "amber" ? AlertTriangle : Info;
   return (
-    <p className={`flex items-start gap-2 rounded-lg px-3 py-2 text-xs ${cls}`}>
+    <p className={`flex items-start gap-2 rounded-md px-3 py-2 text-xs ${cls}`}>
       <Icon className="mt-0.5 size-3.5 shrink-0" />
       <span>{children}</span>
     </p>
@@ -217,10 +207,8 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed bg-muted/30 px-6 py-10 text-center">
-      <span className="flex size-10 items-center justify-center rounded-xl bg-teal-100 text-teal-700 dark:bg-teal-900/60 dark:text-teal-300">
-        <Icon className="size-5" />
-      </span>
+    <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-rule-2 bg-paper-2 px-6 py-10 text-center">
+      <Icon className="size-5 text-ink-3" />
       <p className="text-sm font-semibold">{title}</p>
       <p className="max-w-sm text-xs text-muted-foreground">{sub}</p>
       {action}
@@ -233,7 +221,7 @@ export function TicketChip({ id, onClick }: { id: string; onClick?: () => void }
     <button
       type="button"
       onClick={onClick}
-      className="rounded-md border bg-background px-2 py-0.5 font-mono text-[11px] transition-colors hover:border-teal-400 hover:text-teal-700 dark:hover:text-teal-300"
+      className="hit-44 inline-flex min-h-9 items-center rounded-md border border-rule bg-key-face px-2 font-mono text-[11px] text-ink-2 transition-colors hover:border-signal hover:text-signal-deep"
     >
       {id}
     </button>
@@ -266,9 +254,9 @@ export function Drawer({
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] dark:bg-black/60" onClick={onClose} />
+      <div className="absolute inset-0 bg-graphite/60" onClick={onClose} />
       <aside
-        className={`rise absolute right-0 top-0 flex h-full w-full flex-col border-l bg-card shadow-2xl ${wide ? "max-w-2xl" : "max-w-xl"}`}
+        className={`absolute right-0 top-0 flex h-full w-full flex-col border-l border-rule bg-card shadow-2xl ${wide ? "max-w-2xl" : "max-w-xl"}`}
       >
         <header className="flex items-start justify-between gap-3 border-b px-4 py-3.5 sm:px-5 sm:py-4">
           <div className="min-w-0">
@@ -279,7 +267,7 @@ export function Drawer({
             type="button"
             onClick={onClose}
             aria-label="Close panel"
-            className="-mr-1 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:p-1.5"
+            className="hit-44 -mr-1 flex size-9 items-center justify-center rounded-md text-ink-3 transition-colors hover:bg-paper-2 hover:text-ink"
           >
             <X className="size-4" />
           </button>

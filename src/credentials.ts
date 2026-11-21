@@ -5,9 +5,9 @@
 export type TierId = "decision" | "flash" | "max";
 
 export const TIERS: { id: TierId; label: string; model: string }[] = [
-  { id: "decision", label: "Tier 1 · classifier", model: "decision-model-preview" },
-  { id: "flash", label: "Tier 2 · light", model: "qwen3.8-flash" },
-  { id: "max", label: "Tier 2 · heavy", model: "qwen3.8-max" },
+  { id: "decision", label: "Tier 1 classifier", model: "decision-model-preview" },
+  { id: "flash", label: "Tier 2 light", model: "qwen3.8-flash" },
+  { id: "max", label: "Tier 2 heavy", model: "qwen3.8-max" },
 ];
 
 export interface TierEntry {

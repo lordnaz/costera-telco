@@ -133,7 +133,7 @@ export function HowItWorks({ desk }: { desk: Desk }) {
         <div className="grid gap-3 md:grid-cols-2">
           {PRINCIPLES.map((p) => (
             <div key={p.title} className="flex gap-3 rounded-lg border bg-card p-3">
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-signal-wash text-signal-deep">
                 <p.icon className="size-4" />
               </span>
               <div>
@@ -182,7 +182,7 @@ export function HowItWorks({ desk }: { desk: Desk }) {
             },
           ].map((s) => (
             <li key={s.n} className="flex gap-3 rounded-lg border bg-card px-3 py-2.5">
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-teal-500 to-emerald-600 text-xs font-bold text-white">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-graphite text-xs font-bold text-graphite-ink">
                 {s.n}
               </span>
               <p className="text-sm leading-relaxed">{s.body}</p>

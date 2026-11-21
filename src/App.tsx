@@ -6,6 +6,9 @@ import {
   BookOpen,
   Check,
   ChevronDown,
+  CircleCheck,
+  CircleDashed,
+  CircleX,
   FileText,
   History,
   Home,
@@ -20,6 +23,8 @@ import {
   ReceiptText,
   Settings,
   ShieldAlert,
+  Sparkles,
+  TriangleAlert,
   Users,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -51,6 +56,7 @@ const NAV: { view: View; label: string; icon: typeof Home }[] = [
   { view: "tickets", label: "Ticket inbox", icon: Inbox },
   { view: "human", label: "Human review", icon: Users },
   { view: "patterns", label: "Evidence & patterns", icon: LineChart },
+  { view: "findings", label: "AI findings", icon: Sparkles },
   { view: "brief", label: "Escalation brief", icon: FileText },
   { view: "history", label: "Run history", icon: History },
   { view: "cost", label: "Cost analytics", icon: BarChart3 },
@@ -61,10 +67,10 @@ const TITLES: Record<View, [string, string]> = {
   how: ["How it works", "The architecture behind the desk, and how to run your first triage."],
   overview: ["Triage desk", "Resolve routine tickets. Focus human attention where it matters."],
   tickets: ["Ticket inbox", "Every synthetic ticket in the latest batch, searchable and sortable."],
-  human: ["Human review", "Low confidence or credits / refunds — never auto-resolved."],
+  human: ["Human review", "Low confidence or credits / refunds, never auto-resolved."],
   patterns: ["Evidence & patterns", "Recurring clusters observed in synthetic data, with quoted evidence."],
-  findings: ["AI findings", "Model-generated cluster analysis — verify before acting."],
-  brief: ["Escalation brief", "Deterministic draft assembled from evidence — review before sending."],
+  findings: ["AI findings", "Model-generated cluster analysis; verify before acting."],
+  brief: ["Escalation brief", "Deterministic draft assembled from evidence; review before sending."],
   cost: ["Cost analytics", "Routed cost vs an all-flagship baseline at assumed rates."],
   history: ["Run history", "Session runs with per-ticket request/response traces."],
   settings: ["Settings", "Workspace, appearance and routing policy."],
@@ -99,6 +105,7 @@ export default function App() {
   const [preflightOpen, setPreflightOpen] = useState(false);
   const [demoInfo, setDemoInfo] = useState<DemoAccessInfo | null>(null);
   const [demoMode, setDemoMode] = useState(false);
+  const [demoDetailsOpen, setDemoDetailsOpen] = useState(false);
   const [demoModels, setDemoModels] = useState({ decision: "", flash: "", max: "" });
   const [demoEngine, setDemoEngine] = useState<"systemone" | "chat">("systemone");
   const [demoProvider, setDemoProvider] = useState<PresetId>("qwen");
@@ -260,7 +267,7 @@ export default function App() {
     setExtras((prev) =>
       prev.some((e) => e.ticketId === id)
         ? prev
-        : [...prev, { ticketId: id, line: `${id} — marked for brief review in this session (local mark only; does not change the draft).` }],
+        : [...prev, { ticketId: id, line: `${id}: marked for brief review in this session (local mark only; does not change the draft).` }],
     );
   }, []);
 
@@ -324,6 +331,7 @@ export default function App() {
     tickets: batch?.tickets.length,
     human: result?.humanQueue.length,
     patterns: result?.patterns.length,
+    findings: result?.analyses.length,
     history: runs.length,
   };
 
@@ -335,21 +343,21 @@ export default function App() {
       className={`flex items-center gap-2.5 rounded-lg text-sm transition-colors ${
         compact ? "shrink-0 px-3 py-1.5 text-xs" : "w-full px-3 py-2"
       } ${
-        n.view === "how"
-          ? "bg-gradient-to-r from-teal-600 to-emerald-600 font-semibold text-white shadow-sm shadow-teal-600/25 hover:from-teal-500 hover:to-emerald-500 hover:text-white"
-          : view === n.view
-            ? "bg-teal-50 font-semibold text-teal-700 dark:bg-teal-950/60 dark:text-teal-300"
-            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+        view === n.view
+          ? "bg-signal-wash font-semibold text-signal-deep"
+          : n.view === "how"
+            ? "font-semibold text-signal-deep hover:bg-paper-2"
+            : "text-muted-foreground hover:bg-paper-2 hover:text-foreground"
       }`}
     >
       <n.icon className="size-4 shrink-0" />
       <span className="flex-1 text-left">{n.label}</span>
       {counts[n.view] != null && (
         <span
-          className={`rounded-full px-1.5 py-0.5 font-mono text-[10px] ${
+          className={`rounded-md px-1.5 py-0.5 font-mono text-[11px] ${
             n.view === "human"
-              ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
-              : "bg-muted text-muted-foreground"
+              ? "bg-paper-3 text-warn"
+              : "bg-paper-3 text-ink-3"
           }`}
         >
           {counts[n.view]}
@@ -371,9 +379,9 @@ export default function App() {
 
   return (
     <div className="flex min-h-dvh bg-background text-foreground">
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r bg-sidebar lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r bg-sidebar lg:flex">
         <div className="flex items-center gap-2.5 px-5 pb-4 pt-5">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white shadow-md shadow-teal-600/25">
+          <span className="flex size-9 items-center justify-center rounded-md bg-graphite text-graphite-ink">
             <Layers className="size-4" />
           </span>
           <span className="text-lg font-bold tracking-tight">COSTERA</span>
@@ -395,27 +403,27 @@ export default function App() {
             href="https://krackeddevs.com/profile/nazlamp"
             target="_blank"
             rel="noreferrer"
-            title="Built by @nazlamp · Kracked Devs profile"
-            className="group block rounded-lg border border-teal-600/25 bg-gradient-to-br from-teal-50 to-emerald-50 px-3 py-2.5 shadow-sm shadow-teal-600/10 transition-colors hover:border-teal-600/50 dark:border-teal-500/25 dark:from-teal-950/50 dark:to-emerald-950/40 dark:hover:border-teal-400/50"
+            title="Built by @nazlamp, Kracked Devs profile"
+            className="group block rounded-md border border-rule bg-paper-2 px-3 py-2.5 transition-colors hover:border-rule-2"
           >
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-teal-700/80 dark:text-teal-300/80">
+            <p className="text-[11px] font-medium text-ink-3">
               Built by
             </p>
-            <p className="flex items-center gap-1 text-sm font-bold text-teal-800 dark:text-teal-200">
+            <p className="flex items-center gap-1 text-sm font-bold text-ink">
               @nazlamp
               <ArrowUpRight className="size-3.5 opacity-50 transition-opacity group-hover:opacity-100" />
             </p>
-            <p className="text-[11px] text-muted-foreground">Kracked Devs · demo workspace</p>
+            <p className="text-[11px] text-muted-foreground">Kracked Devs, demo workspace</p>
           </a>
           {navButton({ view: "settings", label: "Settings", icon: Settings })}
         </div>
       </aside>
 
-      <div className="min-w-0 flex-1">
-        <header className="sticky top-0 z-30 border-b bg-background/85 backdrop-blur-md">
+      <div className="min-w-0 flex-1 lg:ml-60">
+        <header className="sticky top-0 z-30 border-b bg-background">
           <div className="flex flex-wrap items-center gap-3 px-3 py-2.5 sm:px-5 sm:py-3">
             <span className="flex items-center gap-2 lg:hidden">
-              <span className="flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-teal-500 to-emerald-600 text-white">
+              <span className="flex size-7 items-center justify-center rounded-md bg-graphite text-graphite-ink">
                 <Layers className="size-3.5" />
               </span>
               <span className="text-sm font-bold tracking-tight">COSTERA</span>
@@ -425,29 +433,30 @@ export default function App() {
             </p>
             <div className="ml-auto flex items-center gap-2">
               {health?.mode === "fixture" ? (
-                <Badge className="bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200" title="Simulated classifier responses for local development — not live model calls">
+                <Badge className="text-warn" title="Simulated classifier responses for local development, not live model calls">
                   Fixture mode
                 </Badge>
               ) : demoMode ? (
                 <Badge
-                  className="cursor-pointer bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200"
-                  title="Owner-provided server-side access for the bounty review window only — retired after review. Click to open Settings."
+                  className="cursor-pointer text-signal-deep"
+                  title="Owner-provided server-side access for the bounty review window only, retired after review. Click to open Settings."
                   onClick={() => setView("settings")}
                 >
-                  <Hourglass /> Temporary reviewer access · {presetLabel}
+                  <Hourglass /> Temporary reviewer access ({presetLabel})
                 </Badge>
               ) : byo ? (
                 <Badge
-                  className="cursor-pointer bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-200"
-                  title="Reviewer-supplied session API key — memory only, cleared on refresh, used for this request alone. Click to open Settings."
+                  className="cursor-pointer text-ok"
+                  title="Reviewer-supplied session API key: memory only, cleared on refresh, used for this request alone. Click to open Settings."
                   onClick={() => setView("settings")}
                 >
-                  <span className="size-1.5 rounded-full bg-teal-500" /> Session API key
+                  <CircleCheck /> Session API key
                 </Badge>
               ) : (
                 <Badge
-                  className="cursor-pointer bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200"
-                  title="This build has no server-side key — click to open Settings and add your own API access"
+                  variant="outline"
+                  className="cursor-pointer text-ink-2 hover:text-foreground"
+                  title="This build has no server-side key. Click to open Settings and add your own API access"
                   onClick={() => setView("settings")}
                 >
                   <KeyRound /> Add access in Settings
@@ -481,21 +490,17 @@ export default function App() {
                   onClick={run}
                   disabled={!canRun}
                   size="sm"
-                  className={
-                    result
-                      ? "flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-600/25 hover:from-emerald-500 hover:to-teal-500 disabled:shadow-none sm:flex-none"
-                      : "flex-1 bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-md shadow-teal-600/25 hover:from-teal-500 hover:to-emerald-500 disabled:shadow-none sm:flex-none"
-                  }
+                  className="flex-1 sm:flex-none"
                   title={
                     result
-                      ? "Triage already completed — reload the page to run again"
+                      ? "Triage already completed. Reload the page to run again"
                       : health?.mode === "live"
                         ? "Opens a setup checklist until all three tiers are Test-confirmed"
                         : undefined
                   }
                 >
                   {result ? <Check /> : running ? <Loader2 className="animate-spin" /> : <Play />}
-                  {result ? "Triage complete" : running ? "Triaging…" : `Run triage · ${batch?.tickets.length ?? 0}`}
+                  {result ? "Triage complete" : running ? "Triaging…" : `Run triage (${batch?.tickets.length ?? 0})`}
                 </Button>
               )}
             </div>
@@ -504,23 +509,63 @@ export default function App() {
           {view !== "how" && (
             <div
               role="note"
-              className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-900 shadow-xs dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
+              className="rounded-md border border-rule bg-paper-2 px-4 py-2.5 text-sm text-ink-2"
             >
-              <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-              <p>
-                <span className="font-semibold">Demo environment — synthetic demo data.</span> All tickets, customers,
-                plans and outages are fictional; patterns are observations in synthetic data — not verified network
-                truth. No real customer information. <span className="font-semibold">No persistence yet:</span> this build
-                has no database, so a page refresh resets the desk — the run, findings, brief, marks and history are gone
-                and your API access must be entered again in Settings.
-              </p>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <AlertTriangle className="size-4 shrink-0 text-warn" />
+                <p className="min-w-0 flex-1">
+                  <span className="font-semibold">Demo environment: synthetic demo data.</span>{" "}
+                  <span className="font-semibold">No persistence yet:</span> a page refresh resets the desk.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setDemoDetailsOpen((v) => !v)}
+                  aria-expanded={demoDetailsOpen}
+                  className="hit-44 -my-2 inline-flex min-h-9 items-center gap-1 text-xs font-semibold text-signal-deep hover:underline active:text-signal"
+                >
+                  Details
+                  <ChevronDown className={`size-3.5 transition-transform ${demoDetailsOpen ? "rotate-180" : ""}`} />
+                </button>
+              </div>
+              {demoDetailsOpen && (
+                <p className="mt-2 border-t pt-2 text-xs leading-relaxed">
+                  All tickets, customers, plans and outages are fictional; patterns are observations in synthetic
+                  data, not verified network truth. No real customer information. This build has no database, so a
+                  page refresh resets the desk; the run, findings, brief, marks and history are gone and your API
+                  access must be entered again in Settings.
+                </p>
+              )}
+              {health?.mode === "live" &&
+                ((demoMode && TIERS.some((t) => tierStatus[t.id].state !== "ok")) ||
+                  (!demoMode && (!byo || !tiersComplete))) && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2 border-t pt-2 text-xs">
+                    <span className="min-w-0 flex-1">
+                      {demoMode
+                        ? `Temporary reviewer access (${presetLabel} preset) is active; the owner's key and endpoint stay server-side. This access is retired after the bounty review.`
+                        : !byo
+                          ? "No API access this session. Add your own key in Settings, or use the temporary reviewer access offered there."
+                          : "Session setup is incomplete: every tier needs a key, an HTTPS endpoint and a chosen model before triage can run."}
+                    </span>
+                    <Button size="sm" onClick={() => setView("settings")}>
+                      {demoMode ? (
+                        <>
+                          <Check /> Test all three tiers
+                        </>
+                      ) : (
+                        <>
+                          <KeyRound /> Set API access first
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
             </div>
           )}
 
           {health?.mode === "fixture" && (
-            <Alert className="border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
+            <Alert className="border-rule bg-paper-2 text-ink-2 [&>svg]:text-warn">
               <AlertTriangle />
-              <AlertTitle>Fixture mode — local development</AlertTitle>
+              <AlertTitle>Fixture mode: local development</AlertTitle>
               <AlertDescription>
                 Classifier responses are simulated fixtures, not live model calls. The published site calls real
                 models using the API access each reviewer enters in Settings.
@@ -528,39 +573,6 @@ export default function App() {
             </Alert>
           )}
 
-          {health?.mode === "live" &&
-            ((demoMode && TIERS.some((t) => tierStatus[t.id].state !== "ok")) ||
-              (!demoMode && (!byo || !tiersComplete))) && (
-              <div className="flex flex-wrap items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
-                <AlertTriangle className="size-3.5 shrink-0" />
-                <span className="min-w-0 flex-1">
-                  {demoMode
-                    ? `Temporary reviewer access (${presetLabel} preset) is active — the owner's key and endpoint stay server-side. This access is retired after the bounty review.`
-                    : !byo
-                      ? "No API access this session — add your own key in Settings, or use the temporary reviewer access offered there."
-                      : "Session setup is incomplete — every tier needs a key, an HTTPS endpoint and a chosen model before triage can run."}
-                </span>
-                <Button
-                  size="sm"
-                  className={
-                    demoMode
-                      ? "bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-sm shadow-teal-600/25 hover:from-teal-500 hover:to-emerald-500 hover:text-white"
-                      : "bg-gradient-to-r from-red-600 to-rose-500 text-white shadow-sm shadow-red-600/25 hover:from-red-500 hover:to-rose-400 hover:text-white"
-                  }
-                  onClick={() => setView("settings")}
-                >
-                  {demoMode ? (
-                    <>
-                      <Check /> Test all three tiers
-                    </>
-                  ) : (
-                    <>
-                      <KeyRound /> Set API access first
-                    </>
-                  )}
-                </Button>
-              </div>
-            )}
           {loadError && (
             <Alert variant="destructive">
               <AlertTriangle />
@@ -604,19 +616,19 @@ export default function App() {
           {view === "history" && <HistoryView desk={desk} />}
           {view === "settings" && <SettingsView desk={desk} />}
 
-          <footer className="space-y-1 pb-2 pt-4 text-center text-xs text-muted-foreground">
-            <p>COSTERA bounty demo · fictional telco · all data synthetic · your own API access, never stored</p>
-            <p>
+          <footer className="space-y-1 pb-2 pt-4 text-xs text-muted-foreground">
+            <p>COSTERA bounty demo. Fictional telco, all data synthetic. Your own API access, never stored.</p>
+            <p className="lg:hidden">
               Built by{" "}
               <a
                 href="https://krackeddevs.com/profile/nazlamp"
                 target="_blank"
                 rel="noreferrer"
-                className="font-semibold text-teal-700 underline decoration-teal-600/40 underline-offset-2 hover:text-teal-600 dark:text-teal-300 dark:hover:text-teal-200"
+                className="font-semibold text-signal-deep underline decoration-signal/40 underline-offset-2 hover:text-signal"
               >
                 @nazlamp
-              </a>{" "}
-              · Kracked Devs
+              </a>
+              , Kracked Devs
             </p>
           </footer>
         </main>
@@ -630,18 +642,18 @@ export default function App() {
           aria-labelledby="preflight-title"
         >
           <div
-            className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] dark:bg-black/60"
+            className="absolute inset-0 bg-graphite/60"
             onClick={() => setPreflightOpen(false)}
           />
-          <div className="rise scrollbar-thin relative max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-xl border bg-card p-4 shadow-2xl sm:p-5">
+          <div className="scrollbar-thin relative max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-lg border border-rule bg-card p-4 shadow-2xl sm:p-5">
             <h2 id="preflight-title" className="flex items-center gap-2 text-base font-semibold tracking-tight">
-              <ShieldAlert className="size-4 text-amber-600" />
+              <ShieldAlert className="size-4 text-warn" />
               {demoMode ? "Test the 3-tier reviewer access first" : "Finish the 3-tier AI setup first"}
             </h2>
             <p className="mt-1.5 text-sm text-muted-foreground">
               {demoMode
-                ? "Temporary reviewer access supplies the key and endpoint server-side — they are never shown here. Each tier still needs a chosen model (pre-filled with the verified setup) and a passing Test before triage can run."
-                : "Triage needs all three tiers configured — a key, an HTTPS endpoint and a chosen model — each confirmed accessible with Test. Your own access is what gets used — fixture mode (local development) is the only run that skips this step."}
+                ? "Temporary reviewer access supplies the key and endpoint server-side; they are never shown here. Each tier still needs a chosen model (pre-filled with the verified setup) and a passing Test before triage can run."
+                : "Triage needs all three tiers configured (a key, an HTTPS endpoint and a chosen model), each confirmed accessible with Test. Your own access is what gets used; fixture mode (local development) is the only run that skips this step."}
             </p>
             <ul className="mt-3 space-y-2">
               {TIERS.map((t) => {
@@ -650,19 +662,20 @@ export default function App() {
                 const status = tierStatus[t.id];
                 const chip = !configured
                   ? [
-                      "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300",
+                      "text-warn",
+                      <TriangleAlert className="size-3" />,
                       demoMode ? "Choose a model in Settings" : "Add key, endpoint & model",
                     ]
                   : status.state === "ok"
-                    ? ["bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300", "Ready"]
+                    ? ["text-ok", <CircleCheck className="size-3" />, "Ready"]
                     : status.state === "error"
-                      ? ["bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300", "Test failed — check Settings"]
+                      ? ["text-error", <CircleX className="size-3" />, "Test failed, check Settings"]
                       : status.state === "testing"
-                        ? ["bg-muted text-muted-foreground", "Testing…"]
-                        : ["bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300", "Press Test to confirm access"];
+                        ? ["text-ink-3", <Loader2 className="size-3 animate-spin" />, "Testing…"]
+                        : ["text-signal-deep", <CircleDashed className="size-3" />, "Press Test to confirm access"];
                 return (
-                  <li key={t.id} className="flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2">
-                    <span className="text-xs font-bold uppercase tracking-wide text-teal-700 dark:text-teal-300">
+                  <li key={t.id} className="flex flex-wrap items-center gap-2 rounded-md border border-rule px-3 py-2">
+                    <span className="text-xs font-semibold text-ink-2">
                       {t.label}
                     </span>
                     {model ? (
@@ -670,8 +683,9 @@ export default function App() {
                     ) : (
                       <span className="text-xs italic text-muted-foreground">no selection</span>
                     )}
-                    <span className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-medium ${chip[0]}`}>
+                    <span className={`ml-auto inline-flex items-center gap-1 text-[11px] font-medium ${chip[0]}`}>
                       {chip[1]}
+                      {chip[2]}
                     </span>
                   </li>
                 );
@@ -680,7 +694,8 @@ export default function App() {
             <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
               <Button
                 size="sm"
-                className="justify-start bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-sm shadow-teal-600/25 hover:from-teal-500 hover:to-emerald-500 hover:text-white sm:mr-auto"
+                variant="outline"
+                className="justify-start sm:mr-auto"
                 onClick={() => {
                   setPreflightOpen(false);
                   setView("how");
@@ -715,12 +730,12 @@ export default function App() {
           aria-labelledby="demo-consent-title"
         >
           <div
-            className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] dark:bg-black/60"
+            className="absolute inset-0 bg-graphite/60"
             onClick={() => setDemoConsentOpen(false)}
           />
-          <div className="rise scrollbar-thin relative max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-xl border bg-card p-4 shadow-2xl sm:p-5">
+          <div className="scrollbar-thin relative max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-lg border border-rule bg-card p-4 shadow-2xl sm:p-5">
             <h2 id="demo-consent-title" className="flex items-center gap-2 text-base font-semibold tracking-tight">
-              <Hourglass className="size-4 text-violet-600 dark:text-violet-400" /> Temporary reviewer access ·{" "}
+              <Hourglass className="size-4 text-signal-deep" /> Temporary reviewer access:{" "}
               {consentProvider === "ilmu" ? "ILMU" : "Qwen"} preset
             </h2>
             <p className="mt-1.5 text-sm text-muted-foreground">
@@ -728,48 +743,48 @@ export default function App() {
               can review the full workflow end to end.
             </p>
             {consentInfo?.models && (
-              <p className="mt-2 rounded-md border bg-muted/50 px-3 py-2 font-mono text-[11px]">
-                {consentInfo.models.decision} (Tier 1) · {consentInfo.models.flash} (Tier 2 light) ·{" "}
+              <p className="mt-2 rounded-md border border-rule bg-paper-2 px-3 py-2 font-mono text-[11px]">
+                {consentInfo.models.decision} (Tier 1), {consentInfo.models.flash} (Tier 2 light),{" "}
                 {consentInfo.models.max} (Tier 2 heavy)
               </p>
             )}
             {consentProvider === "ilmu" && (
-              <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+              <p className="mt-2 text-xs text-warn">
                 The ILMU preset classifies Tier 1 via the chat engine (self-reported confidence) and is not yet
-                verified end-to-end — check the run trace before relying on results.
+                verified end-to-end; check the run trace before relying on results.
               </p>
             )}
             <ul className="mt-3 space-y-2 text-sm">
               <li className="flex gap-2">
-                <Hourglass className="mt-0.5 size-4 shrink-0 text-violet-600 dark:text-violet-400" />
+                <Hourglass className="mt-0.5 size-4 shrink-0 text-signal-deep" />
                 <span>
                   <span className="font-medium">Temporary by design.</span> Available only for the bounty review
                   window; disabled once the submission has been reviewed and approved.
                 </span>
               </li>
               <li className="flex gap-2">
-                <KeyRound className="mt-0.5 size-4 shrink-0 text-teal-600 dark:text-teal-400" />
+                <KeyRound className="mt-0.5 size-4 shrink-0 text-ink-3" />
                 <span>
                   <span className="font-medium">After retirement, only your own key works.</span> The owner removes the
                   pre-setup env; bring-your-own access in Settings remains the permanent path.
                 </span>
               </li>
               <li className="flex gap-2">
-                <Lock className="mt-0.5 size-4 shrink-0 text-teal-600 dark:text-teal-400" />
+                <Lock className="mt-0.5 size-4 shrink-0 text-ink-3" />
                 <span>
                   <span className="font-medium">Key and endpoint stay hidden.</span> They are never sent to your
                   browser and cannot be viewed or edited while this mode is on.
                 </span>
               </li>
               <li className="flex gap-2">
-                <Check className="mt-0.5 size-4 shrink-0 text-teal-600 dark:text-teal-400" />
+                <Check className="mt-0.5 size-4 shrink-0 text-ok" />
                 <span>
                   <span className="font-medium">Test before you run.</span> Press Test on all three tiers in Settings;
                   Run triage unlocks only after all three confirm access.
                 </span>
               </li>
               <li className="flex gap-2">
-                <ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warn" />
                 <span>
                   <span className="font-medium">Nothing is stored.</span> Refreshing the page or exiting this mode
                   returns the desk to bring-your-own access.
@@ -780,11 +795,7 @@ export default function App() {
               <Button variant="outline" size="sm" onClick={() => setDemoConsentOpen(false)}>
                 Cancel
               </Button>
-              <Button
-                size="sm"
-                className="bg-gradient-to-r from-violet-600 to-teal-600 text-white shadow-sm shadow-violet-600/25 hover:from-violet-500 hover:to-teal-500 hover:text-white"
-                onClick={enableDemo}
-              >
+              <Button size="sm" onClick={enableDemo}>
                 <Hourglass /> Use temporary {consentProvider === "ilmu" ? "ILMU" : "Qwen"} access
               </Button>
             </div>
@@ -796,8 +807,8 @@ export default function App() {
         open={logRun !== null}
         onClose={() => setLogRun(null)}
         wide
-        title={logRun ? `Run log · ${logRun.id.slice(0, 8)}` : "Run log"}
-        sub={logRun ? `${new Date(logRun.at).toLocaleString()} · ${logRun.mode} · ${logRun.trace.length} traced calls` : undefined}
+        title={logRun ? `Run log: ${logRun.id.slice(0, 8)}` : "Run log"}
+        sub={logRun ? `${new Date(logRun.at).toLocaleString()}, ${logRun.mode}, ${logRun.trace.length} traced calls` : undefined}
       >
         {logRun && (
           <div className="space-y-3">
@@ -809,11 +820,11 @@ export default function App() {
               <div key={i} className="rounded-lg border px-3.5 py-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <StageBadge stage={t.stage} />
-                  <span className="font-mono text-xs font-semibold">{t.ticketId ?? t.clusterKey ?? "—"}</span>
+                  <span className="font-mono text-xs font-semibold">{t.ticketId ?? t.clusterKey ?? "n/a"}</span>
                   {t.lane && <LaneBadge lane={t.lane} />}
                   <span className="ml-auto font-mono text-[11px] text-muted-foreground">
-                    {t.latencyMs != null ? `${t.latencyMs} ms` : "—"}
-                    {t.inputTokens != null ? ` · ${t.inputTokens} in` : ""}
+                    {t.latencyMs != null ? `${t.latencyMs} ms` : "n/a"}
+                    {t.inputTokens != null ? `, ${t.inputTokens} in` : ""}
                     {t.outputTokens != null ? ` / ${t.outputTokens} out` : ""}
                   </span>
                 </div>
@@ -821,18 +832,18 @@ export default function App() {
                   <p className="mt-1 text-xs text-muted-foreground">{t.reasons.join("; ")}</p>
                 )}
                 <details className="mt-2">
-                  <summary className="cursor-pointer text-xs font-medium text-teal-700 dark:text-teal-300">
+                  <summary className="cursor-pointer text-xs font-medium text-signal-deep">
                     Request body
                   </summary>
-                  <pre className="scrollbar-thin mt-1 max-h-56 overflow-auto rounded-md bg-muted/60 p-2.5 font-mono text-[11px]">
+                  <pre className="scrollbar-thin mt-1 max-h-56 overflow-auto rounded-md bg-graphite p-2.5 font-mono text-[11px] text-graphite-ink">
                     {JSON.stringify(t.request, null, 2)}
                   </pre>
                 </details>
                 <details className="mt-1.5">
-                  <summary className="cursor-pointer text-xs font-medium text-teal-700 dark:text-teal-300">
+                  <summary className="cursor-pointer text-xs font-medium text-signal-deep">
                     Raw response
                   </summary>
-                  <pre className="scrollbar-thin mt-1 max-h-56 overflow-auto rounded-md bg-muted/60 p-2.5 font-mono text-[11px]">
+                  <pre className="scrollbar-thin mt-1 max-h-56 overflow-auto rounded-md bg-graphite p-2.5 font-mono text-[11px] text-graphite-ink">
                     {JSON.stringify(t.response, null, 2)}
                   </pre>
                 </details>
@@ -847,7 +858,7 @@ export default function App() {
         onClose={() => setTicketOpen(null)}
         wide
         title={ticketOpen ?? "Ticket"}
-        sub={openTicketTr ? `${openTicketTr.intent ?? "unclassified"} · routed ${openTicketTr.lane}` : "Not routed yet"}
+        sub={openTicketTr ? `${openTicketTr.intent ?? "unclassified"}, routed ${openTicketTr.lane}` : "Not routed yet"}
       >
         <div className="space-y-5">
           <TicketDetail
@@ -864,12 +875,12 @@ export default function App() {
           />
           {ticketTrace.length > 0 && (
             <div>
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <h4 className="text-xs font-semibold text-ink-3">
                 Run trace for this ticket
               </h4>
               {ticketTrace.some((t) => t.stage === "tier2_heavy") && (
                 <p className="mt-1 text-[11px] text-muted-foreground">
-                  Tier 2 heavy runs per cluster, not per ticket — the heavy-lane call below covers this ticket's
+                  Tier 2 heavy runs per cluster, not per ticket; the heavy-lane call below covers this ticket's
                   analysed cluster.
                 </p>
               )}
@@ -879,14 +890,14 @@ export default function App() {
                     <div className="flex flex-wrap items-center gap-2">
                       <StageBadge stage={t.stage} />
                       <span className="font-mono text-[11px] text-muted-foreground">
-                        {t.latencyMs != null ? `${t.latencyMs} ms` : "—"}
+                        {t.latencyMs != null ? `${t.latencyMs} ms` : "n/a"}
                       </span>
                     </div>
                     <details className="mt-1.5">
-                      <summary className="cursor-pointer text-xs font-medium text-teal-700 dark:text-teal-300">
+                      <summary className="cursor-pointer text-xs font-medium text-signal-deep">
                         Request / response
                       </summary>
-                      <pre className="scrollbar-thin mt-1 max-h-64 overflow-auto rounded-md bg-muted/60 p-2.5 font-mono text-[11px]">
+                      <pre className="scrollbar-thin mt-1 max-h-64 overflow-auto rounded-md bg-graphite p-2.5 font-mono text-[11px] text-graphite-ink">
                         {JSON.stringify({ request: t.request, response: t.response }, null, 2)}
                       </pre>
                     </details>
@@ -898,7 +909,7 @@ export default function App() {
           {openTicketTr?.summary && (
             <InfoNote>
               Summary above generated by{" "}
-              {result?.models?.flash ? <ModelName>{result.models.flash}</ModelName> : "the light-lane model"} — model
+              {result?.models?.flash ? <ModelName>{result.models.flash}</ModelName> : "the light-lane model"}; model
               output, verify before use.
             </InfoNote>
           )}

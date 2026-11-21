@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Brain, ChevronLeft, ChevronRight, ExternalLink, FileText, Plus, Check, Search, Quote } from "lucide-react";
+import { AlertTriangle, Brain, ChevronLeft, ChevronRight, FileText, Plus, Check, Search, Quote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Batch, Ticket, TicketResult, TriageResult } from "../types";
 import { ConfidenceBar, InfoNote, LaneBadge, ModelName, TicketChip } from "./bits";
@@ -87,7 +87,7 @@ export function TicketTable({
               setPage(0);
             }}
             placeholder="Search tickets…"
-            className="w-full rounded-lg border bg-background py-2 pl-8 pr-2.5 text-xs outline-none transition-colors focus:border-teal-500 focus:ring-2 focus:ring-teal-500/25 sm:py-1.5"
+            className="w-full rounded-md border border-input bg-key-face py-2 pl-8 pr-2.5 text-xs transition-colors focus:border-signal"
           />
         </label>
         <div className="grid grid-cols-2 gap-2 sm:contents">
@@ -98,7 +98,7 @@ export function TicketTable({
               setPage(0);
             }}
             aria-label="Filter by lane"
-            className="w-full rounded-lg border bg-background px-2.5 py-2 text-xs outline-none focus:border-teal-500 sm:w-auto sm:py-1.5"
+            className="w-full rounded-md border border-input bg-key-face px-2.5 py-2 text-xs focus:border-signal sm:w-auto"
           >
             <option value="all">All lanes</option>
             <option value="direct">Direct / code</option>
@@ -111,7 +111,7 @@ export function TicketTable({
             value={sort}
             onChange={(e) => setSort(e.target.value)}
             aria-label="Sort tickets"
-            className="w-full rounded-lg border bg-background px-2.5 py-2 text-xs outline-none focus:border-teal-500 sm:w-auto sm:py-1.5"
+            className="w-full rounded-md border border-input bg-key-face px-2.5 py-2 text-xs focus:border-signal sm:w-auto"
           >
             <option value="priority">Sort: review priority</option>
             <option value="id">Sort: ticket ID</option>
@@ -129,8 +129,8 @@ export function TicketTable({
               onClick={() => onSelect(r.ticket.id)}
               className={`cursor-pointer rounded-lg border px-3 py-2.5 transition-colors ${
                 active
-                  ? "border-teal-500 bg-teal-50/80 shadow-[inset_3px_0_0_0_var(--primary)] dark:bg-teal-950/40"
-                  : "bg-card hover:bg-muted/40"
+                  ? "border-signal bg-signal-wash shadow-[inset_3px_0_0_0_var(--color-signal)]"
+                  : "bg-card hover:bg-paper-2"
               }`}
             >
               <div className="flex items-center justify-between gap-2">
@@ -139,7 +139,7 @@ export function TicketTable({
               </div>
               <p className="mt-1 text-xs text-muted-foreground">{issueTitle(r.ticket.text)}</p>
               <div className="mt-2 flex items-center justify-between gap-3">
-                <span className="text-[11px] text-muted-foreground">{r.tr?.intent ?? "—"}</span>
+                <span className="text-[11px] text-muted-foreground">{r.tr?.intent ?? "n/a"}</span>
                 <span className="w-28 shrink-0">
                   <ConfidenceBar value={r.tr?.confidence ?? null} probabilities={r.tr?.probabilities} />
                 </span>
@@ -150,7 +150,7 @@ export function TicketTable({
                     e.stopPropagation();
                     onOpen(r.ticket.id);
                   }}
-                  className="-my-1 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  className="hit-44 -my-1 flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-paper-2 hover:text-foreground"
                 >
                   <ChevronRight className="size-4" />
                 </button>
@@ -165,10 +165,10 @@ export function TicketTable({
         )}
       </ul>
 
-      <div className="scrollbar-thin mt-3 hidden overflow-x-auto rounded-lg border sm:block">
+      <div className="scrollbar-thin cut-sm mt-3 hidden overflow-x-auto sm:block">
         <table className="w-full min-w-130 text-sm">
           <thead>
-            <tr className="border-b bg-muted/50 text-left text-xs text-muted-foreground">
+            <tr className="border-b bg-paper-2 text-left text-xs text-muted-foreground">
               <th className="px-3 py-2 font-medium">Ticket / issue</th>
               <th className="px-3 py-2 font-medium">Intent</th>
               <th className="px-3 py-2 font-medium">Confidence</th>
@@ -185,15 +185,15 @@ export function TicketTable({
                   onClick={() => onSelect(r.ticket.id)}
                   className={`cursor-pointer border-b last:border-0 transition-colors ${
                     active
-                      ? "bg-teal-50/80 shadow-[inset_3px_0_0_0_var(--primary)] dark:bg-teal-950/40"
-                      : "hover:bg-muted/40"
+                      ? "bg-signal-wash shadow-[inset_3px_0_0_0_var(--color-signal)]"
+                      : "hover:bg-paper-2"
                   }`}
                 >
                   <td className="px-3 py-2.5">
                     <p className="font-mono text-xs font-semibold">{r.ticket.id}</p>
                     <p className="mt-0.5 max-w-56 truncate text-xs text-muted-foreground">{issueTitle(r.ticket.text)}</p>
                   </td>
-                  <td className="px-3 py-2.5 text-xs">{r.tr?.intent ?? "—"}</td>
+                  <td className="px-3 py-2.5 text-xs">{r.tr?.intent ?? "n/a"}</td>
                   <td className="px-3 py-2.5">
                     <ConfidenceBar value={r.tr?.confidence ?? null} probabilities={r.tr?.probabilities} />
                   </td>
@@ -206,7 +206,7 @@ export function TicketTable({
                         e.stopPropagation();
                         onOpen(r.ticket.id);
                       }}
-                      className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      className="hit-44 flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-paper-2 hover:text-foreground"
                     >
                       <ChevronRight className="size-4" />
                     </button>
@@ -227,16 +227,16 @@ export function TicketTable({
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
-          Showing {rows.length === 0 ? 0 : safePage * pageSize + 1}–{Math.min(rows.length, (safePage + 1) * pageSize)} of{" "}
+          Showing {rows.length === 0 ? 0 : safePage * pageSize + 1} to {Math.min(rows.length, (safePage + 1) * pageSize)} of{" "}
           {rows.length} tickets
         </p>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           <button
             type="button"
             aria-label="Previous page"
             disabled={safePage === 0}
             onClick={() => setPage(safePage - 1)}
-            className="rounded-md border p-2 transition-colors hover:bg-muted disabled:opacity-40 sm:p-1.5"
+            className="hit-44 flex size-9 items-center justify-center rounded-md border border-rule-2 bg-key-face transition-colors hover:bg-paper-2 disabled:opacity-40"
           >
             <ChevronLeft className="size-3.5" />
           </button>
@@ -245,8 +245,10 @@ export function TicketTable({
               key={i}
               type="button"
               onClick={() => setPage(i)}
-              className={`size-8 rounded-md border font-mono text-xs transition-colors sm:size-7 ${
-                i === safePage ? "border-teal-600 bg-teal-600 text-white" : "hover:bg-muted"
+              className={`hit-44 size-9 rounded-md border font-mono text-xs transition-colors ${
+                i === safePage
+                  ? "border-signal-edge bg-signal text-signal-ink shadow-[var(--shadow-key-accent)]"
+                  : "border-rule-2 bg-key-face hover:bg-paper-2"
               }`}
             >
               {i + 1}
@@ -257,7 +259,7 @@ export function TicketTable({
             aria-label="Next page"
             disabled={safePage >= pages - 1}
             onClick={() => setPage(safePage + 1)}
-            className="rounded-md border p-2 transition-colors hover:bg-muted disabled:opacity-40 sm:p-1.5"
+            className="hit-44 flex size-9 items-center justify-center rounded-md border border-rule-2 bg-key-face transition-colors hover:bg-paper-2 disabled:opacity-40"
           >
             <ChevronRight className="size-3.5" />
           </button>
@@ -289,7 +291,7 @@ export function TicketDetail({
 }) {
   if (!ticket) {
     return (
-      <p className="rounded-xl border border-dashed bg-muted/30 px-4 py-8 text-center text-xs text-muted-foreground">
+      <p className="rounded-lg border border-dashed border-rule-2 bg-paper-2 px-4 py-8 text-center text-xs text-muted-foreground">
         Select a ticket in the worklist to see its message, routing rationale and evidence.
       </p>
     );
@@ -311,8 +313,8 @@ export function TicketDetail({
           <p className="font-mono text-sm font-semibold">{ticket.id}</p>
           <span className="flex flex-wrap items-center gap-1.5">
             {analysis && (
-              <span className="inline-flex rounded-full bg-fuchsia-50 px-2.5 py-0.5 text-[11px] font-medium text-fuchsia-700 dark:bg-fuchsia-950/60 dark:text-fuchsia-300">
-                Cluster analysed
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-signal-deep">
+                <Brain className="size-3" /> Cluster analysed
               </span>
             )}
             {tr ? <LaneBadge lane={tr.lane} /> : <span className="text-xs text-muted-foreground">Not routed yet</span>}
@@ -320,40 +322,36 @@ export function TicketDetail({
         </div>
         <h3 className="mt-1.5 text-base font-semibold tracking-tight">{issueTitle(ticket.text)}</h3>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          {tr?.intent ?? "Unclassified"} · Synthetic customer {ticket.customer} · {ticket.channel}
+          {tr?.intent ?? "Unclassified"}, synthetic customer {ticket.customer}, {ticket.channel}
         </p>
       </div>
 
       <div>
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Customer message</h4>
-        <blockquote className="mt-1.5 rounded-lg bg-muted/60 px-3 py-2.5 text-sm italic">
+        <h4 className="text-xs font-semibold text-ink-3">Customer message</h4>
+        <blockquote className="mt-1.5 rounded-md bg-paper-2 px-3 py-2.5 text-sm italic">
           <Quote className="mb-1 size-3.5 text-muted-foreground" />
           {ticket.text}
         </blockquote>
       </div>
 
       <div>
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <h4 className="text-xs font-semibold text-ink-3">
           {tr?.lane === "human_review" ? "Why this needs review" : "Routing rationale"}
         </h4>
         <p className="mt-1.5 flex items-start gap-2 text-sm">
-          <span
-            className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-              tr?.lane === "human_review" || tr?.unsure
-                ? "bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300"
-                : "bg-teal-100 text-teal-700 dark:bg-teal-900/60 dark:text-teal-300"
-            }`}
-          >
-            !
-          </span>
+          {tr?.lane === "human_review" || tr?.unsure ? (
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warn" />
+          ) : (
+            <Check className="mt-0.5 size-4 shrink-0 text-ok" />
+          )}
           <span>
             {tr
               ? tr.reasons.length > 0
                 ? tr.reasons.join("; ")
                 : tr.unsure
-                  ? `Classifier confidence ${Math.round((tr.confidence ?? 0) * 100)}% — below the 70% threshold.`
+                  ? `Classifier confidence ${Math.round((tr.confidence ?? 0) * 100)}%, below the 70% threshold.`
                   : `Classified ${tr.intent} at ${Math.round((tr.confidence ?? 0) * 100)}% confidence; routed by policy.`
-              : "Not routed yet — run triage to classify and route this ticket."}
+              : "Not routed yet. Run triage to classify and route this ticket."}
           </span>
         </p>
         {tr?.summary && (
@@ -365,7 +363,7 @@ export function TicketDetail({
       </div>
 
       <div>
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recommended next step</h4>
+        <h4 className="text-xs font-semibold text-ink-3">Recommended next step</h4>
         <p className="mt-1.5 flex items-start gap-2 text-sm">
           <FileText className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
           <span>{analysis?.nextStep ?? nextStep}</span>
@@ -373,11 +371,11 @@ export function TicketDetail({
       </div>
 
       {analysis && (
-        <div className="rounded-lg border border-fuchsia-200/80 bg-fuchsia-50/50 px-3.5 py-3 dark:border-fuchsia-900/60 dark:bg-fuchsia-950/25">
-          <h4 className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fuchsia-700 dark:text-fuchsia-300">
+        <div className="rounded-md border border-rule bg-paper-2 px-3.5 py-3">
+          <h4 className="flex flex-wrap items-center gap-2 text-xs font-semibold text-signal-deep">
             <Brain className="size-3.5" />
-            Tier 2 heavy · cluster analysis
-            <span className="rounded-full bg-fuchsia-100 px-2 py-0.5 text-[10px] font-medium normal-case text-fuchsia-700 dark:bg-fuchsia-900/60 dark:text-fuchsia-300">
+            Tier 2 heavy: cluster analysis
+            <span className="rounded-md border border-rule px-2 py-0.5 text-[11px] font-medium text-ink-3">
               model-generated
             </span>
           </h4>
@@ -390,28 +388,28 @@ export function TicketDetail({
           )}
           {analysis.caveats && <p className="mt-1 text-xs italic text-muted-foreground">{analysis.caveats}</p>}
           <p className="mt-1.5 text-[11px] text-muted-foreground">
-            Generated by <ModelName>{analysis.model}</ModelName> for this ticket's cluster ({analysis.count} tickets) —
+            Generated by <ModelName>{analysis.model}</ModelName> for this ticket's cluster ({analysis.count} tickets);
             verify before acting.
           </p>
           {onViewFindings && (
             <button
               type="button"
               onClick={onViewFindings}
-              className="mt-2 text-xs font-semibold text-fuchsia-700 hover:underline dark:text-fuchsia-300"
+              className="mt-2 text-xs font-semibold text-signal-deep hover:underline"
             >
-              View full finding →
+              View full finding
             </button>
           )}
         </div>
       )}
 
       <div>
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Evidence</h4>
+        <h4 className="text-xs font-semibold text-ink-3">Evidence</h4>
         <div className="mt-1.5 flex flex-wrap gap-1.5">
           <TicketChip id={`Ticket ${ticket.id}`} onClick={() => onOpen(ticket.id)} />
           {tr?.lookup && <TicketChip id={tr.lookup.label} onClick={() => onOpen(ticket.id)} />}
           {tr?.quotes.slice(0, 2).map((qline, i) => (
-            <span key={i} className="max-w-52 truncate rounded-md border bg-muted/50 px-2 py-0.5 text-[11px] italic">
+            <span key={i} className="max-w-52 truncate rounded-md border border-rule bg-paper-2 px-2 py-0.5 text-[11px] italic">
               “{qline}”
             </span>
           ))}
@@ -420,15 +418,12 @@ export function TicketDetail({
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" onClick={() => onOpen(ticket.id)}>
-          <ExternalLink /> Open ticket
-        </Button>
         <Button
           size="sm"
           variant="outline"
           disabled={added}
           onClick={() => onAdd(ticket.id)}
-          title="Local review mark only — never changes the draft, is not copied, and is never sent"
+          title="Local review mark only; never changes the draft, is not copied, and is never sent"
         >
           {added ? <Check /> : <Plus />} {added ? "Marked for brief" : "Add to brief"}
         </Button>

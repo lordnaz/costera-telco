@@ -3,6 +3,7 @@ import {
   ArrowRight,
   BarChart3,
   Check,
+  ChevronDown,
   Copy,
   Eye,
   EyeOff,
@@ -100,12 +101,12 @@ export function HumanView({ desk }: { desk: Desk }) {
           {queue.map((h) => {
             const tr = desk.result!.tickets.find((t) => t.id === h.id);
             return (
-              <li key={h.id} className="rounded-lg border bg-amber-50/40 px-4 py-3 dark:bg-amber-950/20">
+              <li key={h.id} className="rounded-md border border-rule bg-paper-2 px-4 py-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <TicketChip id={h.id} onClick={() => desk.openTicket(h.id)} />
                   {tr && <Badge variant="outline">{tr.intent ?? "unknown intent"}</Badge>}
                   {tr?.unsure && (
-                    <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">Tier 1 unsure</Badge>
+                    <Badge className="text-warn">Tier 1 unsure</Badge>
                   )}
                   <span className="w-full text-xs text-muted-foreground sm:ml-auto sm:w-auto">{h.reasons.join("; ")}</span>
                 </div>
@@ -158,7 +159,7 @@ export function PatternsView({ desk }: { desk: Desk }) {
           <button
             type="button"
             onClick={() => desk.setView("findings")}
-            className="inline-flex items-center gap-1 text-xs font-semibold text-violet-700 hover:underline dark:text-violet-300"
+            className="inline-flex items-center gap-1 text-xs font-semibold text-signal-deep hover:underline"
           >
             AI findings <ArrowRight className="size-3.5" />
           </button>
@@ -224,7 +225,7 @@ export function FindingsView({ desk }: { desk: Desk }) {
         }
         sub="Cross-ticket cluster analysis, warranted clusters only"
         action={
-          <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">model-generated</Badge>
+          <Badge className="text-warn">model-generated</Badge>
         }
       >
         {analyses.length === 0 ? (
@@ -232,7 +233,7 @@ export function FindingsView({ desk }: { desk: Desk }) {
         ) : (
           <div className="space-y-4">
             {analyses.map((a) => (
-              <article key={a.key} className="rounded-lg border bg-violet-50/40 px-4 py-3 dark:bg-violet-950/20">
+              <article key={a.key} className="rounded-md border border-rule bg-paper-2 px-4 py-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="text-sm font-semibold">{a.title}</h3>
                   <Badge variant="outline">{a.count} tickets</Badge>
@@ -306,7 +307,7 @@ export function BriefView({ desk }: { desk: Desk }) {
                 type="button"
                 aria-label={`Remove mark for ${e.ticketId}`}
                 onClick={() => desk.removeBrief(e.ticketId)}
-                className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-red-600"
+                className="rounded-md p-1 text-muted-foreground hover:bg-paper-2 hover:text-error"
               >
                 <Trash2 className="size-3.5" />
               </button>
@@ -368,9 +369,9 @@ export function CostView({ desk }: { desk: Desk }) {
                       <dt className="text-[10px] text-muted-foreground">Baseline</dt>
                       <dd className="font-mono text-xs font-semibold">{usd(c.baseline)}</dd>
                     </div>
-                    <div className="rounded-md bg-teal-50 px-1 py-1.5 dark:bg-teal-950/50">
+                    <div className="rounded-md bg-signal-wash px-1 py-1.5">
                       <dt className="text-[10px] text-muted-foreground">Saved</dt>
-                      <dd className="font-mono text-xs font-semibold text-teal-700 dark:text-teal-300">
+                      <dd className="font-mono text-xs font-semibold text-signal-deep">
                         {c.savingsPct != null ? `${c.savingsPct.toFixed(0)}%` : "—"}
                       </dd>
                     </div>
@@ -403,7 +404,7 @@ export function CostView({ desk }: { desk: Desk }) {
                       </td>
                       <td className="px-3 py-2 font-mono text-xs">{usd(c.routed)}</td>
                       <td className="px-3 py-2 font-mono text-xs">{usd(c.baseline)}</td>
-                      <td className="px-3 py-2 font-mono text-xs font-semibold text-teal-700 dark:text-teal-300">
+                      <td className="px-3 py-2 font-mono text-xs font-semibold text-signal-deep">
                         {c.savingsPct != null ? `${c.savingsPct.toFixed(0)}%` : "—"}
                       </td>
                     </tr>
@@ -446,7 +447,7 @@ export function HistoryView({ desk }: { desk: Desk }) {
             const c = computeCost(r.stats, ratesForModels(r.models));
             return (
               <li key={r.id} className="flex flex-wrap items-center gap-3 rounded-lg border px-3 py-3 sm:px-4">
-                <span className="flex size-9 items-center justify-center rounded-lg bg-teal-100 text-teal-700 dark:bg-teal-900/60 dark:text-teal-300">
+                <span className="flex size-9 items-center justify-center rounded-md bg-signal-wash text-signal-deep">
                   <History className="size-4" />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -507,7 +508,7 @@ export function SettingsView({ desk }: { desk: Desk }) {
               onClick={() => desk.setTheme(t.id)}
               className={`flex flex-1 flex-col items-center gap-1.5 rounded-lg border px-3 py-3 text-xs font-medium transition-colors ${
                 desk.theme === t.id
-                  ? "border-teal-600 bg-teal-50 text-teal-700 dark:bg-teal-950/50 dark:text-teal-300"
+                  ? "border-signal bg-signal-wash text-signal-deep"
                   : "hover:bg-muted"
               }`}
             >
@@ -552,20 +553,20 @@ export function SettingsView({ desk }: { desk: Desk }) {
       <SectionCard title="Routing policy" sub="Deterministic rules applied after the Tier 1 classifier">
         <ul className="space-y-2 text-sm">
           <li className="flex gap-2">
-            <ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-600" />
+            <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warn" />
             Confidence below 70% → human review, flagged unsure.
           </li>
           <li className="flex gap-2">
-            <ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-600" />
+            <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warn" />
             Credits / refunds → human review regardless of confidence.
           </li>
           <li className="flex gap-2">
-            <Sparkles className="mt-0.5 size-4 shrink-0 text-violet-600" />
+            <Sparkles className="mt-0.5 size-4 shrink-0 text-signal-deep" />
             Complex with no deterministic answer → Tier 2 candidate; heavy-lane analysis only for warranted clusters (4+
             tickets, or 2+ with unsure/candidate members), max 4 analyses per run.
           </li>
           <li className="flex gap-2">
-            <Inbox className="mt-0.5 size-4 shrink-0 text-teal-600" />
+            <Inbox className="mt-0.5 size-4 shrink-0 text-signal-deep" />
             Everything else → direct code lane, zero model tokens.
           </li>
         </ul>
@@ -626,7 +627,7 @@ function SecretInput({
         aria-label={ariaLabel}
         autoComplete="off"
         spellCheck={false}
-        className="w-full rounded-lg border bg-background py-1.5 pl-2.5 pr-8 font-mono text-xs outline-none transition-colors focus:border-teal-500 focus:ring-2 focus:ring-teal-500/25"
+        className="w-full rounded-md border border-input bg-key-face py-1.5 pl-2.5 pr-8 font-mono text-xs transition-colors focus:border-signal"
       />
       <button
         type="button"
@@ -643,6 +644,8 @@ function SecretInput({
 function ByoAccess({ desk }: { desk: Desk }) {
   const [shown, setShown] = useState<Record<string, boolean>>({});
   const [custom, setCustom] = useState<Record<TierId, boolean>>({ decision: false, flash: false, max: false });
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [disclaimerOpen, setDisclaimerOpen] = useState(false);
   const tests = desk.tierStatus;
   const demo = desk.demoMode;
   const models = demo
@@ -705,14 +708,13 @@ function ByoAccess({ desk }: { desk: Desk }) {
   };
   const modelOptions = (tier: TierId, list: CatalogModel[]) =>
     families(list).map((f) => (
-      <optgroup key={f} label={f === "Qwen" ? "Qwen · verified end-to-end" : f}>
+      <optgroup key={f} label={f === "Qwen" ? "Qwen (verified end-to-end)" : f}>
         {list
           .filter((m) => m.family === f)
           .map((m) => (
             <option key={m.id} value={m.id}>
-              {isRecommendedFor(tier, m.id) ? "★ " : ""}
-              {m.id} · {m.role}
-              {isRecommendedFor(tier, m.id) ? " (Recommended)" : ""}
+              {m.id}, {m.role}
+              {isRecommendedFor(tier, m.id) ? " (recommended)" : ""}
             </option>
           ))}
       </optgroup>
@@ -743,8 +745,8 @@ function ByoAccess({ desk }: { desk: Desk }) {
               state: "ok",
               message:
                 r.models != null
-                  ? `Access confirmed · ${r.models} models visible on this endpoint`
-                  : "Access confirmed · key accepted by endpoint",
+                  ? `Access confirmed: ${r.models} models visible on this endpoint`
+                  : "Access confirmed: key accepted by endpoint",
             }
           : { state: "error", message: r.message ?? r.error ?? "Rejected by endpoint." },
       );
@@ -758,13 +760,13 @@ function ByoAccess({ desk }: { desk: Desk }) {
       title={
         <>
           {demo ? "Reviewer API access" : "Bring your own API access"}{" "}
-          <Badge variant="outline">{demo ? "temporary · review window" : "session only"}</Badge>
+          <Badge variant="outline">{demo ? "temporary review window" : "session only"}</Badge>
         </>
       }
       sub={
         demo
-          ? "Owner-provided server-side access for the bounty review — the key and endpoint stay hidden and are retired after review"
-          : "Your own key per tier model — nothing is ever billed to the site owner unless you opt into the temporary reviewer access"
+          ? "Owner-provided server-side access for the bounty review. The key and endpoint stay hidden and are retired after review."
+          : "Your own key per tier model. Nothing is ever billed to the site owner unless you opt into the temporary reviewer access."
       }
       action={
         demo ? (
@@ -787,108 +789,97 @@ function ByoAccess({ desk }: { desk: Desk }) {
       }
     >
       <div className="space-y-4">
+        <div className="rounded-md border border-rule bg-paper-2 px-4 py-2.5">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <FlaskConical className="size-4 shrink-0 text-signal-deep" />
+            <p className="min-w-0 flex-1 text-sm text-ink-2">
+              <span className="font-semibold text-foreground">Recommended setup.</span> Verified end-to-end with the
+              Qwen and ILMU families.
+            </p>
+            <button
+              type="button"
+              onClick={() => setSetupOpen((v) => !v)}
+              aria-expanded={setupOpen}
+              className="hit-44 -my-2 inline-flex min-h-9 items-center gap-1 text-xs font-semibold text-signal-deep hover:underline active:text-signal"
+            >
+              Models and endpoints
+              <ChevronDown className={`size-3.5 transition-transform ${setupOpen ? "rotate-180" : ""}`} />
+            </button>
+          </div>
+          {!demo && (desk.demoInfo?.available || desk.demoInfo?.ilmu?.available) && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 border-t pt-2">
+              {desk.demoInfo?.available && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => desk.requestDemo("qwen")}
+                  className="border-[#082dff]/30 bg-white text-[#082dff] shadow-sm hover:bg-[#082dff]/5 hover:text-[#082dff] dark:border-[#082dff]/60 dark:bg-white dark:hover:bg-[#082dff]/10"
+                >
+                  <QwenLogo className="size-4" /> Use Qwen family preset
+                </Button>
+              )}
+              {desk.demoInfo?.ilmu?.available && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => desk.requestDemo("ilmu")}
+                  className="border-[#0048cc]/30 bg-white text-[#00205b] shadow-sm hover:bg-[#0048cc]/5 hover:text-[#0048cc] dark:border-[#0048cc]/60 dark:bg-white dark:hover:bg-[#0048cc]/10"
+                >
+                  <IlmuLogo className="size-4" /> Use ILMU family preset
+                </Button>
+              )}
+              <span className="text-[11px] text-muted-foreground">
+                No key of your own? Borrow the owner's pre-setup for the review window.
+              </span>
+            </div>
+          )}
+          {setupOpen && (
+            <ul className="mt-2 space-y-1 border-t pt-2 text-xs text-ink-2">
+              <li>
+                <span className="font-medium text-foreground">Tier 1 classifier:</span>{" "}
+                <ModelName>decision-model-preview</ModelName>, decision contract (/systemone), calibrated probabilities
+              </li>
+              <li>
+                <span className="font-medium text-foreground">Tier 2 light:</span> <ModelName>qwen3.8-flash</ModelName>,
+                chat/completions
+              </li>
+              <li>
+                <span className="font-medium text-foreground">Tier 2 heavy:</span> <ModelName>qwen3.8-max</ModelName>,
+                chat/completions
+              </li>
+              <li>
+                <span className="font-medium text-foreground">ILMU family (also verified end-to-end):</span>{" "}
+                <ModelName>ilmu-mini-v3.3</ModelName> (Tier 1), <ModelName>ilmu-glm-5.3-flash</ModelName> (Tier 2
+                light), <ModelName>ilmu-glm-5.3</ModelName> (Tier 2 heavy), all via chat/completions
+              </li>
+              <li>
+                <span className="font-medium text-foreground">Qwen endpoint:</span> an Alibaba MaaS (Qwen)
+                OpenAI-compatible base URL ending in <span className="font-mono">/compatible-mode/v1</span>; one shared
+                API key covers all three tiers.
+              </li>
+              <li>
+                <span className="font-medium text-foreground">ILMU endpoint:</span> an ILMU OpenAI-compatible base URL
+                ending in <span className="font-mono">/v1</span>; one shared API key covers all three tiers.
+              </li>
+            </ul>
+          )}
+        </div>
         {demo && (
-          <div className="flex items-start gap-2.5 rounded-lg border border-violet-300/80 bg-violet-50/80 px-3.5 py-3 dark:border-violet-800/60 dark:bg-violet-950/30">
-            <Hourglass className="mt-0.5 size-4 shrink-0 text-violet-700 dark:text-violet-300" />
-            <div className="flex-1 text-xs text-violet-900 dark:text-violet-100">
-              <p className="text-[11px] font-semibold uppercase tracking-wide">
-                Temporary reviewer access active · {desk.demoProvider === "ilmu" ? "ILMU" : "Qwen"} preset
+          <div className="flex items-start gap-2.5 rounded-md border border-rule bg-paper-2 px-3.5 py-3">
+            <Hourglass className="mt-0.5 size-4 shrink-0 text-signal-deep" />
+            <div className="flex-1 text-xs text-ink-2">
+              <p className="font-semibold text-foreground">
+                Temporary reviewer access active ({desk.demoProvider === "ilmu" ? "ILMU" : "Qwen"} preset)
               </p>
               <p className="mt-1">
                 The owner's pre-configured key and endpoint are used server-side for the bounty review window only.
                 They are never shown in this browser and cannot be edited here. This access will be disabled after the
-                submission has been reviewed and approved — afterwards only your own API key works. Press Test on all
+                submission has been reviewed and approved; afterwards only your own API key works. Press Test on all
                 three tiers below to unlock Run triage.
               </p>
             </div>
           </div>
         )}
-        <div className="flex items-start gap-2.5 rounded-lg border border-amber-300/80 bg-amber-50/80 px-3.5 py-3 dark:border-amber-800/60 dark:bg-amber-950/30">
-          <FlaskConical className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-300" />
-          <div className="flex-1 text-xs text-amber-900 dark:text-amber-100">
-            <p className="text-[11px] font-semibold uppercase tracking-wide">Reviewer testing disclaimer</p>
-            <p className="mt-1">
-              The full end-to-end workflow — classify, route, escalate, brief and cost readout — has been tested
-              and verified with two families: Qwen (<ModelName>decision-model-preview</ModelName> Tier 1,{" "}
-              <ModelName>qwen3.8-flash</ModelName> Tier 2 light, <ModelName>qwen3.8-max</ModelName> Tier 2 heavy)
-              and ILMU (<ModelName>ilmu-mini-v3.3</ModelName> Tier 1, <ModelName>ilmu-glm-5.3-flash</ModelName>{" "}
-              Tier 2 light, <ModelName>ilmu-glm-5.3</ModelName> Tier 2 heavy). Other providers and models share
-              the same OpenAI-compatible contract but are not end-to-end verified: response shapes, confidence
-              calibration and assumed rates may differ. Use the per-tier Test button and check the run trace
-              before relying on results.
-            </p>
-            <div className="mt-2.5 rounded-md border border-amber-300/60 bg-background/70 px-3 py-2.5 dark:border-amber-800/50 dark:bg-background/40">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-teal-700 dark:text-teal-300">
-                Recommended setup · 100% verified workflow
-              </p>
-              <ul className="mt-1.5 space-y-1 text-foreground/90 dark:text-foreground/90">
-                <li>
-                  <span className="font-medium">Tier 1 classifier:</span> <ModelName>decision-model-preview</ModelName>{" "}
-                  · decision contract (/systemone), calibrated probabilities
-                </li>
-                <li>
-                  <span className="font-medium">Tier 2 light:</span> <ModelName>qwen3.8-flash</ModelName> ·
-                  chat/completions
-                </li>
-                <li>
-                  <span className="font-medium">Tier 2 heavy:</span> <ModelName>qwen3.8-max</ModelName> ·
-                  chat/completions
-                </li>
-                <li>
-                  <span className="font-medium">ILMU family (also verified end-to-end):</span>{" "}
-                  <ModelName>ilmu-mini-v3.3</ModelName> (Tier 1), <ModelName>ilmu-glm-5.3-flash</ModelName> (Tier 2
-                  light), <ModelName>ilmu-glm-5.3</ModelName> (Tier 2 heavy) · all via chat/completions
-                </li>
-                <li>
-                  <span className="font-medium">Qwen endpoint:</span> an Alibaba MaaS (Qwen) OpenAI-compatible base
-                  URL ending in <span className="font-mono">/compatible-mode/v1</span>; one shared API key covers all
-                  three tiers.
-                </li>
-                <li>
-                  <span className="font-medium">ILMU endpoint:</span> an ILMU OpenAI-compatible base URL ending in{" "}
-                  <span className="font-mono">/v1</span>; one shared API key covers all three tiers.
-                </li>
-              </ul>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                {!demo && desk.demoInfo?.available && (
-                  <>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => desk.requestDemo("qwen")}
-                      className="border-[#082dff]/30 bg-white text-[#082dff] shadow-sm hover:bg-[#082dff]/5 hover:text-[#082dff] dark:border-[#082dff]/60 dark:bg-white dark:hover:bg-[#082dff]/10"
-                    >
-                      <QwenLogo className="size-4" /> Use Qwen-Family Model Preset
-                    </Button>
-                    <span className="text-[11px] text-muted-foreground">
-                      No key of your own? Borrow the owner's Qwen pre-setup for the review window.
-                    </span>
-                  </>
-                )}
-                {!demo && desk.demoInfo?.ilmu?.available && (
-                  <>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => desk.requestDemo("ilmu")}
-                      className="border-[#0048cc]/30 bg-white text-[#00205b] shadow-sm hover:bg-[#0048cc]/5 hover:text-[#0048cc] dark:border-[#0048cc]/60 dark:bg-white dark:hover:bg-[#0048cc]/10"
-                    >
-                      <IlmuLogo className="size-4" /> Use ILMU-Family Model Preset
-                    </Button>
-                    <span className="text-[11px] text-muted-foreground">
-                      ILMU family pre-setup: ilmu-mini-v3.3 · ilmu-glm-5.3-flash · ilmu-glm-5.3.
-                    </span>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-        <InfoNote tone="amber">
-          {demo
-            ? "Temporary reviewer access lives in this page's memory only: a refresh clears it and returns the desk to bring-your-own. There is no database in this build, so reloading also resets the desk itself — the last run, findings, brief and history disappear and triage has to be run again. The owner's key and endpoint never reach this browser."
-            : "Keys and endpoints live in this page's memory only: a refresh clears them and you must enter them again. There is no database in this build, so reloading also resets the desk itself — the last run, findings, brief and history disappear and triage has to be run again. Credentials are sent to this site's server over HTTPS solely for your run — never stored, never logged, never written to disk or browser storage."}
-        </InfoNote>
         {demo ? (
           <div className="flex items-center gap-2.5 rounded-lg border border-dashed px-3.5 py-2.5 text-xs text-muted-foreground">
             <Lock className="size-4 shrink-0" />
@@ -905,7 +896,7 @@ function ByoAccess({ desk }: { desk: Desk }) {
                 placeholder="https://your-maas-host/compatible-mode/v1"
                 autoComplete="off"
                 spellCheck={false}
-                className="mt-1 w-full rounded-lg border bg-background px-2.5 py-1.5 font-mono text-xs outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/25"
+                className="mt-1 w-full rounded-lg border bg-background px-2.5 py-1.5 font-mono text-xs outline-none focus:border-signal focus:ring-2 focus:ring-signal/25"
               />
             </label>
             <div>
@@ -927,26 +918,22 @@ function ByoAccess({ desk }: { desk: Desk }) {
           {TIERS.map((t) => {
             const ts = tests[t.id];
             return (
-              <div key={t.id} className="rounded-lg border px-3.5 py-3">
+              <div key={t.id} className="rounded-md border px-3.5 py-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <KeyRound className="size-3.5 text-teal-700 dark:text-teal-300" />
-                  <span className="text-xs font-bold uppercase tracking-wide text-teal-700 dark:text-teal-300">{t.label}</span>
-                  {models[t.id].trim() ? (
-                    <ModelName>{models[t.id].trim()}</ModelName>
-                  ) : (
-                    <span className="text-xs italic text-muted-foreground">no selection</span>
-                  )}
+                  <KeyRound className="size-3.5 text-ink-3" />
+                  <span className="text-xs font-semibold text-foreground">{t.label}</span>
+                  {models[t.id].trim() && <ModelName>{models[t.id].trim()}</ModelName>}
                   {isRecommendedFor(t.id, models[t.id].trim()) && (
-                    <span className="rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-medium text-teal-700 dark:bg-teal-950/60 dark:text-teal-300">
+                    <span className="rounded-md bg-signal-wash px-2 py-0.5 text-[10px] font-medium text-signal-deep">
                       recommended
                     </span>
                   )}
                   <span
-                    className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                    className={`ml-auto rounded-md px-2 py-0.5 text-[10px] font-medium ${
                       demo
-                        ? "bg-violet-50 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300"
+                        ? "bg-signal-wash text-signal-deep"
                         : effective(desk.creds, t.id).key
-                          ? "bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300"
+                          ? "bg-ok-wash text-ok"
                           : "bg-muted text-muted-foreground"
                     }`}
                   >
@@ -959,29 +946,27 @@ function ByoAccess({ desk }: { desk: Desk }) {
                       value={classifierValue}
                       onChange={(e) => pickClassifier(e.target.value)}
                       aria-label="Classifier type and model"
-                      className="w-full rounded-lg border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-teal-500"
+                      className="w-full rounded-lg border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-signal"
                     >
-                      <option value="__none">No selection — choose a model</option>
-                      <optgroup label="Decision contract · /systemone (recommended for Tier 1)">
+                      <option value="__none">No selection, choose a model</option>
+                      <optgroup label="Decision contract /systemone (recommended for Tier 1)">
                         {DECISION_CONTRACT_OPTIONS.map((m) => (
                           <option key={m.id} value={`systemone:${m.id}`}>
-                            {isRecommendedFor("decision", m.id) ? "★ " : ""}
-                            {m.name ? `${m.name} · ` : ""}
-                            {m.id} · calibrated probabilities
-                            {isRecommendedFor("decision", m.id) ? " (Recommended)" : ""}
+                            {m.name ? `${m.name}, ` : ""}
+                            {m.id}, calibrated probabilities
+                            {isRecommendedFor("decision", m.id) ? " (recommended)" : ""}
                           </option>
                         ))}
                       </optgroup>
                       {families(CHAT_OPTIONS).map((f) => (
                         <optgroup
                           key={f}
-                          label={f === "Qwen" ? "Chat classifier · Qwen (verified end-to-end)" : `Chat classifier · ${f}`}
+                          label={f === "Qwen" ? "Chat classifier, Qwen (verified end-to-end)" : `Chat classifier, ${f}`}
                         >
                           {CHAT_OPTIONS.filter((m) => m.family === f).map((m) => (
                             <option key={m.id} value={`chat:${m.id}`}>
-                              {isRecommendedFor("decision", m.id) ? "★ " : ""}
-                              {m.id} · {m.role}
-                              {isRecommendedFor("decision", m.id) ? " (Recommended)" : ""}
+                              {m.id}, {m.role}
+                              {isRecommendedFor("decision", m.id) ? " (recommended)" : ""}
                             </option>
                           ))}
                         </optgroup>
@@ -993,9 +978,9 @@ function ByoAccess({ desk }: { desk: Desk }) {
                       value={custom[t.id] ? "__custom" : models[t.id].trim() || "__none"}
                       onChange={(e) => pickTier(t.id, e.target.value)}
                       aria-label={`${t.label} model`}
-                      className="w-full rounded-lg border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-teal-500"
+                      className="w-full rounded-lg border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-signal"
                     >
-                      <option value="__none">No selection — choose a model</option>
+                      <option value="__none">No selection, choose a model</option>
                       {modelOptions(t.id, CHAT_OPTIONS)}
                       <option value="__custom">Custom model ID…</option>
                     </select>
@@ -1008,19 +993,18 @@ function ByoAccess({ desk }: { desk: Desk }) {
                       autoComplete="off"
                       spellCheck={false}
                       aria-label={`${t.label} custom model ID`}
-                      className="mt-2 w-full rounded-lg border bg-background px-2.5 py-1.5 font-mono text-xs outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/25"
+                      className="mt-2 w-full rounded-lg border bg-background px-2.5 py-1.5 font-mono text-xs outline-none focus:border-signal focus:ring-2 focus:ring-signal/25"
                     />
                   )}
                 </div>
                 {demo ? (
                   <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
                     <span className="flex items-center gap-2 rounded-lg border border-dashed px-2.5 py-1.5 text-[11px] text-muted-foreground">
-                      <Lock className="size-3.5 shrink-0" /> Key &amp; URL hidden — supplied server-side
+                      <Lock className="size-3.5 shrink-0" /> Key and URL hidden, supplied server-side
                     </span>
                     <Button
                       size="sm"
                       variant="outline"
-                      className="border-teal-600 font-semibold text-teal-700 hover:bg-teal-50 hover:text-teal-700 dark:border-teal-700 dark:text-teal-300 dark:hover:bg-teal-950/40 dark:hover:text-teal-300"
                       disabled={ts.state === "testing"}
                       onClick={() => test(t.id)}
                     >
@@ -1036,7 +1020,7 @@ function ByoAccess({ desk }: { desk: Desk }) {
                       autoComplete="off"
                       spellCheck={false}
                       aria-label={`${t.model} base URL`}
-                      className="w-full rounded-lg border bg-background px-2.5 py-1.5 font-mono text-xs outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/25"
+                      className="w-full rounded-lg border bg-background px-2.5 py-1.5 font-mono text-xs outline-none focus:border-signal focus:ring-2 focus:ring-signal/25"
                     />
                     <SecretInput
                       value={desk.creds.tiers[t.id].key}
@@ -1049,7 +1033,6 @@ function ByoAccess({ desk }: { desk: Desk }) {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="border-teal-600 font-semibold text-teal-700 hover:bg-teal-50 hover:text-teal-700 dark:border-teal-700 dark:text-teal-300 dark:hover:bg-teal-950/40 dark:hover:text-teal-300"
                       disabled={ts.state === "testing"}
                       onClick={() => test(t.id)}
                     >
@@ -1060,12 +1043,12 @@ function ByoAccess({ desk }: { desk: Desk }) {
                 {ts.state === "ok" && (
                   <p
                     title="The endpoint accepted your key and returned its model list. It does not prove the selected model answers chat calls — run triage and check the run trace for that."
-                    className="mt-1.5 cursor-help text-xs text-teal-700 underline decoration-dotted decoration-teal-600/40 underline-offset-2 dark:text-teal-300"
+                    className="mt-1.5 cursor-help text-xs text-ok underline decoration-dotted decoration-ok/40 underline-offset-2"
                   >
                     {ts.message}
                   </p>
                 )}
-                {ts.state === "error" && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{ts.message}</p>}
+                {ts.state === "error" && <p className="mt-1.5 text-xs text-error">{ts.message}</p>}
               </div>
             );
           })}
@@ -1073,16 +1056,44 @@ function ByoAccess({ desk }: { desk: Desk }) {
         {engine === "chat" && (
           <InfoNote tone="amber">
             Classifier runs on the chat contract, so the flagship (or any chat model) can classify. Confidence is
-            self-reported by the model — no calibrated probabilities — and the 70% unsure floor plus refund rules
+            self-reported by the model (no calibrated probabilities), and the 70% unsure floor plus refund rules
             still apply.
           </InfoNote>
         )}
         <InfoNote>
           {active
             ? decisionReady(desk.creds)
-              ? "Session access detected — runs use only your keys, never a server-side secret. Every tier still needs a key, an HTTPS endpoint and a chosen model, each Test-confirmed, before Run triage proceeds."
-              : "Session key detected, but the Tier 1 classifier key and HTTPS endpoint are incomplete — triage stays blocked until they are set."
-            : "No session key set. This deployment has no server-side key of its own, so real runs need your own access here. Keys stay in memory and are cleared on refresh."}
+              ? "Session access detected. Runs use only your keys, never a server-side secret. Every tier still needs a key, an HTTPS endpoint and a chosen model, each Test-confirmed, before Run triage proceeds."
+              : "Session key detected, but the Tier 1 classifier key and HTTPS endpoint are incomplete; triage stays blocked until they are set."
+            : "No session key set. This deployment has no server-side key of its own, so real runs need your own access here."}
+        </InfoNote>
+        <div className="rounded-md border border-rule bg-paper-2 px-4 py-2.5">
+          <button
+            type="button"
+            onClick={() => setDisclaimerOpen((v) => !v)}
+            aria-expanded={disclaimerOpen}
+            className="hit-44 -my-2 inline-flex min-h-9 w-full items-center gap-2 text-left text-xs font-semibold text-ink-2 transition-transform active:translate-y-px"
+          >
+            <FlaskConical className="size-4 shrink-0 text-warn" />
+            <span className="flex-1">Reviewer testing disclaimer</span>
+            <ChevronDown className={`size-4 transition-transform ${disclaimerOpen ? "rotate-180" : ""}`} />
+          </button>
+          {disclaimerOpen && (
+            <p className="mt-2 border-t pt-2 text-xs leading-relaxed text-ink-2">
+              The full end-to-end workflow — classify, route, escalate, brief and cost readout — has been tested and
+              verified with two families: Qwen (<ModelName>decision-model-preview</ModelName> Tier 1,{" "}
+              <ModelName>qwen3.8-flash</ModelName> Tier 2 light, <ModelName>qwen3.8-max</ModelName> Tier 2 heavy) and
+              ILMU (<ModelName>ilmu-mini-v3.3</ModelName> Tier 1, <ModelName>ilmu-glm-5.3-flash</ModelName> Tier 2
+              light, <ModelName>ilmu-glm-5.3</ModelName> Tier 2 heavy). Other providers and models share the same
+              OpenAI-compatible contract but are not end-to-end verified: response shapes, confidence calibration and
+              assumed rates may differ. Use the per-tier Test button and check the run trace before relying on results.
+            </p>
+          )}
+        </div>
+        <InfoNote>
+          {demo
+            ? "Temporary reviewer access lives in this page's memory only: a refresh clears it and returns the desk to bring-your-own. There is no database in this build, so reloading also resets the desk itself — the last run, findings, brief and history disappear and triage has to be run again. The owner's key and endpoint never reach this browser."
+            : "Keys and endpoints live in this page's memory only: a refresh clears them and you must enter them again. There is no database in this build, so reloading also resets the desk itself — the last run, findings, brief and history disappear and triage has to be run again. Credentials are sent to this site's server over HTTPS solely for your run — never stored, never logged, never written to disk or browser storage."}
         </InfoNote>
       </div>
     </SectionCard>

@@ -1,6 +1,18 @@
+/* Hallmark · shape: app screen · genre: modern-minimal · theme: Cobalt (deal 3/3, seed telco-ticket-triage-ops-worklist-292e·5d3cdb66·2026-11-21·r0) · redesign: restyle
+ * nav: kept (App shell) · signature: kept (worklist + detail pair) · states: idle / running / routed / error, in-memory (kept)
+ * axes: light/grotesk-sans/cool · posture: restrained · contrast: pass · v2.0.0 */
+/* Hallmark · dropped bg-violet-100 text-violet-700, text-violet-700 hover:underline · restyled in place to the cobalt signal; the AI-assisted draft badge and the View all button keep their labels and handlers */
+/* Hallmark · dropped setHowOpen, desk.setView(t.view), architectureUrl · owner-approved composition pass: the how panel became a link to the How it works view where the diagram and full explanation live, and the duplicate tab strip yielded to the sidebar, which gained AI findings */
+/* Hallmark · dismissed 28a · the overview carries no image after the composition pass; the first image sits below the fold in the How it works view, so it is never the LCP and lazy loading is correct there */
+/* Hallmark · dismissed 49 · the routing disclosure button carries the whitespace-nowrap utility, which Tailwind generates at build time, so its label never wraps */
+/* Hallmark · answered F18 · the badge slot is a text chip, not a media slot; 157x22 is its intended shrink-to-fit shape beside the escalation brief heading */
+/* Hallmark · answered F25 · the hidden words are the desktop sidebar credit card; the footer carries the same Kracked Devs credit and profile link on phones */
+
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "../vendor/shadcn-tailwind-4.13.0.css";
+@import "./tokens.css";
+@import "./base.css";
 
 /* Dark-mode utilities follow the data-theme attribute (set before first paint by the
    inline script in index.html and by the Settings theme picker), not just the OS hint. */
@@ -8,7 +20,7 @@
 
 @utility scrollbar-thin {
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in oklab, var(--primary) 38%, transparent) transparent;
+  scrollbar-color: color-mix(in oklab, var(--color-ink-3) 38%, transparent) transparent;
 
   &::-webkit-scrollbar {
     width: 8px;
@@ -19,10 +31,10 @@
   }
   &::-webkit-scrollbar-thumb {
     border-radius: 9999px;
-    background: color-mix(in oklab, var(--primary) 38%, transparent);
+    background: color-mix(in oklab, var(--color-ink-3) 38%, transparent);
   }
   &::-webkit-scrollbar-thumb:hover {
-    background: color-mix(in oklab, var(--primary) 60%, transparent);
+    background: color-mix(in oklab, var(--color-ink-3) 60%, transparent);
   }
 }
 
@@ -43,64 +55,85 @@
   color: var(--model-name);
 }
 
-@utility panel {
-  border-radius: calc(var(--radius) + 8px);
-  border: 1px solid var(--border);
-  background: var(--card);
-  box-shadow:
-    0 1px 2px rgb(15 18 35 / 0.06),
-    0 12px 32px -16px rgb(15 18 35 / 0.14);
-}
-
-@keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
+/* Cobalt surfaces: hairline edge, cut corners where supported, paper step for depth.
+   Components layer so any bg or border utility still wins. */
+@layer components {
+  .cut {
+    border: var(--rule-hair) solid var(--color-rule);
+    border-radius: var(--radius-card);
   }
-  to {
-    opacity: 1;
-    transform: none;
+  .cut-sm {
+    border: var(--rule-hair) solid var(--color-rule);
+    border-radius: var(--radius-input);
+  }
+  .panel {
+    border: var(--rule-hair) solid var(--color-rule);
+    border-radius: var(--radius-card);
+    background: var(--card);
+    color: var(--card-foreground);
+    box-shadow: var(--shadow-card);
+  }
+  @supports (corner-shape: bevel) {
+    .cut,
+    .panel {
+      border-radius: var(--cut-l) 4px var(--cut-l) 4px;
+      corner-shape: bevel round bevel round;
+    }
+    .cut-sm {
+      border-radius: var(--cut) 3px var(--cut) 3px;
+      corner-shape: bevel round bevel round;
+    }
+  }
+  /* 44px hit area on a 36px control; pair with size-9 and gap-2 rows. */
+  .hit-44 {
+    position: relative;
+  }
+  .hit-44::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+  }
+  .measure {
+    max-width: 65ch;
   }
 }
 
-@utility rise {
-  animation: rise 0.45s cubic-bezier(0.22, 0.8, 0.36, 1) both;
-}
-
+/* shadcn names mapped onto the Hallmark token sheet — one source of truth.
+   Dark values live in tokens.css (graphite material), so both modes flip here. */
 :root {
-  --background: #f4f6f9;
-  --foreground: #16202e;
-  --card: #ffffff;
-  --card-foreground: #16202e;
-  --popover: #ffffff;
-  --popover-foreground: #16202e;
-  --primary: #0d9488;
-  --primary-foreground: #ffffff;
-  --secondary: #eef2f6;
-  --secondary-foreground: #16202e;
-  --muted: #eef2f6;
-  --muted-foreground: #5c6b7f;
-  --accent: #e6f4f2;
-  --accent-foreground: #0f766e;
-  --destructive: #dc2626;
-  --border: #e2e8f0;
-  --input: #d7dfe9;
-  --ring: #14b8a6;
-  --chart-1: #0d9488;
-  --chart-2: #f59e0b;
-  --chart-3: #7c3aed;
-  --chart-4: #2563eb;
-  --chart-5: #e11d48;
-  --radius: 0.625rem;
-  --sidebar: #ffffff;
-  --sidebar-foreground: #16202e;
-  --sidebar-primary: #0d9488;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e6f4f2;
-  --sidebar-accent-foreground: #0f766e;
-  --sidebar-border: #e2e8f0;
-  --sidebar-ring: #14b8a6;
-  --model-name: #5b21b6;
+  --background: var(--color-paper);
+  --foreground: var(--color-ink);
+  --card: var(--color-paper);
+  --card-foreground: var(--color-ink);
+  --popover: var(--color-paper);
+  --popover-foreground: var(--color-ink);
+  --primary: var(--color-signal);
+  --primary-foreground: var(--color-signal-ink);
+  --secondary: var(--color-paper-2);
+  --secondary-foreground: var(--color-ink);
+  --muted: var(--color-paper-2);
+  --muted-foreground: var(--color-ink-3);
+  --accent: var(--color-signal-wash);
+  --accent-foreground: var(--color-signal-deep);
+  --destructive: var(--color-error);
+  --border: var(--color-rule);
+  --input: var(--color-field-edge);
+  --ring: var(--color-focus);
+  --chart-1: var(--color-signal);
+  --chart-2: var(--color-warn);
+  --chart-3: var(--color-ink-3);
+  --chart-4: var(--color-signal-2);
+  --chart-5: var(--color-error);
+  --radius: 0.5rem;
+  --sidebar: var(--color-paper);
+  --sidebar-foreground: var(--color-ink);
+  --sidebar-primary: var(--color-signal);
+  --sidebar-primary-foreground: var(--color-signal-ink);
+  --sidebar-accent: var(--color-signal-wash);
+  --sidebar-accent-foreground: var(--color-signal-deep);
+  --sidebar-border: var(--color-rule);
+  --sidebar-ring: var(--color-focus);
+  --model-name: var(--color-signal-deep);
 }
 
 @theme inline {
@@ -135,91 +168,45 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, "Helvetica Neue",
-    Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-    "Liberation Mono", "Courier New", monospace;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --background: #0c1219;
-    --foreground: #e6edf3;
-    --card: #131c26;
-    --card-foreground: #e6edf3;
-    --popover: #131c26;
-    --popover-foreground: #e6edf3;
-    --primary: #14b8a6;
-    --primary-foreground: #06201c;
-    --secondary: #1b2735;
-    --secondary-foreground: #e6edf3;
-    --muted: #1b2735;
-    --muted-foreground: #93a3b5;
-    --accent: #123330;
-    --accent-foreground: #5eead4;
-    --destructive: #f87171;
-    --border: #243249;
-    --input: #2c3d55;
-    --ring: #2dd4bf;
-    --chart-1: #2dd4bf;
-    --chart-2: #fbbf24;
-    --chart-3: #a78bfa;
-    --chart-4: #60a5fa;
-    --chart-5: #fb7185;
-    --sidebar: #101922;
-    --sidebar-foreground: #e6edf3;
-    --sidebar-primary: #2dd4bf;
-    --sidebar-primary-foreground: #06201c;
-    --sidebar-accent: #123330;
-    --sidebar-accent-foreground: #5eead4;
-    --sidebar-border: #243249;
-    --sidebar-ring: #2dd4bf;
-    --model-name: #c4b5fd;
-  }
-}
-
-:root[data-theme="dark"] {
-  --background: #0c1219;
-  --foreground: #e6edf3;
-  --card: #131c26;
-  --card-foreground: #e6edf3;
-  --popover: #131c26;
-  --popover-foreground: #e6edf3;
-  --primary: #14b8a6;
-  --primary-foreground: #06201c;
-  --secondary: #1b2735;
-  --secondary-foreground: #e6edf3;
-  --muted: #1b2735;
-  --muted-foreground: #93a3b5;
-  --accent: #123330;
-  --accent-foreground: #5eead4;
-  --destructive: #f87171;
-  --border: #243249;
-  --input: #2c3d55;
-  --ring: #2dd4bf;
-  --chart-1: #2dd4bf;
-  --chart-2: #fbbf24;
-  --chart-3: #a78bfa;
-  --chart-4: #60a5fa;
-  --chart-5: #fb7185;
-  --sidebar: #101922;
-  --sidebar-foreground: #e6edf3;
-  --sidebar-primary: #2dd4bf;
-  --sidebar-primary-foreground: #06201c;
-  --sidebar-accent: #123330;
-  --sidebar-accent-foreground: #5eead4;
-  --sidebar-border: #243249;
-  --sidebar-ring: #2dd4bf;
-  --model-name: #c4b5fd;
+  --color-paper: var(--color-paper);
+  --color-paper-2: var(--color-paper-2);
+  --color-paper-3: var(--color-paper-3);
+  --color-ink: var(--color-ink);
+  --color-ink-2: var(--color-ink-2);
+  --color-ink-3: var(--color-ink-3);
+  --color-rule: var(--color-rule);
+  --color-rule-2: var(--color-rule-2);
+  --color-signal: var(--color-signal);
+  --color-signal-2: var(--color-signal-2);
+  --color-signal-wash: var(--color-signal-wash);
+  --color-signal-deep: var(--color-signal-deep);
+  --color-signal-ink: var(--color-signal-ink);
+  --color-signal-edge: var(--color-signal-edge);
+  --color-graphite: var(--color-graphite);
+  --color-graphite-2: var(--color-graphite-2);
+  --color-graphite-ink: var(--color-graphite-ink);
+  --color-graphite-muted: var(--color-graphite-muted);
+  --color-key-face: var(--color-key-face);
+  --color-key-edge: var(--color-key-edge);
+  --color-warn: var(--color-warn);
+  --color-warn-wash: var(--color-warn-wash);
+  --color-ok: var(--color-ok);
+  --color-ok-wash: var(--color-ok-wash);
+  --color-error: var(--color-error);
+  --color-error-edge: var(--color-error-edge);
+  --color-error-wash: var(--color-error-wash);
+  --radius-sm: 4px;
+  --radius-md: var(--radius-input);
+  --radius-lg: var(--radius-card);
+  --radius-xl: var(--radius-card);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-outlier);
+  --font-display: var(--font-display);
 }
 
 html {
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in oklab, var(--primary) 38%, transparent) transparent;
+  scrollbar-color: color-mix(in oklab, var(--color-ink-3) 38%, transparent) transparent;
   -webkit-text-size-adjust: 100%;
 }
 
@@ -246,28 +233,9 @@ a,
   -webkit-tap-highlight-color: transparent;
 }
 
-summary:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-  border-radius: 6px;
-}
-
 body {
-  background:
-    radial-gradient(
-      1100px 480px at 85% -140px,
-      color-mix(in oklab, var(--primary) 9%, transparent),
-      transparent 70%
-    ),
-    radial-gradient(
-      900px 420px at -10% -120px,
-      color-mix(in oklab, #2563eb 7%, transparent),
-      transparent 70%
-    ),
-    var(--background);
-  background-attachment: fixed;
+  background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
-  overflow-x: clip;
   padding-bottom: env(safe-area-inset-bottom);
 }
